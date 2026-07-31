@@ -25,6 +25,7 @@ import { SceneManager } from "../scene/SceneManager";
 import { NpcTraffic } from "../scene/NpcTraffic";
 import { Pedestrians } from "../scene/Pedestrians";
 import { CharacterSelect } from "../ui/CharacterSelect";
+import { Landing } from "../ui/Landing";
 import { Overlay } from "../ui/Overlay";
 import { speak, SpeechRecognizer } from "../ui/speech";
 import { actionDescription } from "./commands";
@@ -75,7 +76,11 @@ export class Simulation {
   async init(): Promise<void> {
     this.buildOverlay();
     void checkHealth().then((h) => this.overlay.setFinetunedAvailable(h.finetunedAvailable));
-    new CharacterSelect(this.container, (mode) => this.onCharacterChosen(mode));
+
+    // Explain the project first, then let the visitor pick a point of view.
+    new Landing(this.container, () => {
+      new CharacterSelect(this.container, (mode) => this.onCharacterChosen(mode));
+    });
 
     if (import.meta.env.DEV) {
       (window as unknown as { __rt: unknown }).__rt = {
@@ -139,6 +144,7 @@ export class Simulation {
       onResume: () => this.resumeCruising(),
       onPickPlace: (name) => void this.handleUtterance(`take me to ${name}`),
       onScenario: (id) => this.loadScenario(id),
+      onBoard: () => this.boardTaxi(),
     });
     this.overlay.setMicSupported(this.recognizer.supported);
     this.overlay.setViewMode(this.viewMode);
@@ -166,6 +172,10 @@ export class Simulation {
     this.actorRole = mode === "pedestrian" ? "external" : "passenger";
     this.cameras.setMode(mode);
     this.overlay.setViewMode(mode, keepExamples);
+    // You cannot see the outside of the car you are sitting in.
+    if (this.car) {
+      this.car.root.visible = mode !== "passenger";
+    }
   }
 
   /** Send the taxi to pick the player up wherever they are standing. */
@@ -207,6 +217,22 @@ export class Simulation {
     this.setViewMode(scenario.view, true);
     this.overlay.setScenario(scenario);
     this.overlay.setStatus("Scenario loaded. Try the suggested lines.");
+  }
+
+  /**
+   * Climb into the cab from the pavement.
+   *
+   * This is the moment the whole project is about: the same person, the same
+   * voice, but now speaking as the rider rather than a stranger, so commands
+   * the gate just refused start passing.
+   */
+  private boardTaxi(): void {
+    if (!this.worldReady || !this.car) return;
+    this.car.closeDoors();
+    this.setViewMode("passenger");
+    this.overlay.setCanBoard(false);
+    this.overlay.setStatus("You are in the cab. You are the passenger now.");
+    speak("Welcome aboard. Where would you like to go?");
   }
 
   /** Send the taxi back out cruising after it has stopped or arrived. */
@@ -309,6 +335,14 @@ export class Simulation {
       this.player?.update(dt);
       if (this.viewMode === "pedestrian" && this.player) {
         this.cameras.setPedestrianAnchor(this.player.eyePosition, this.player.heading);
+      }
+
+      // Boarding is offered only on foot, beside the cab, with the doors open.
+      if (this.viewMode === "pedestrian" && this.player) {
+        const gap = this.player.root.position.distanceTo(this.car.root.position);
+        this.overlay.setCanBoard(this.car.doorsAreOpen && gap < 9);
+      } else {
+        this.overlay.setCanBoard(false);
       }
 
       if (this.car.arrived) {
