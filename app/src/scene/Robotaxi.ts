@@ -39,6 +39,8 @@ const REROUTE_AFTER = 2.0;
  * being wide enough that bodies never visibly intersect.
  */
 const MIN_SEPARATION = 2.4;
+/** How long the doors stay open before shutting themselves again. */
+const DOOR_HOLD_SECONDS = 12;
 
 /**
  * The hero vehicle. Construct with {@link load}, then drive with {@link update}
@@ -63,6 +65,8 @@ export class Robotaxi {
   private doorOpenAmount = 0;
   /** Whether the doors are currently commanded open. */
   private doorsOpen = false;
+  /** Seconds left before the doors shut themselves again. */
+  private doorHoldTimer = 0;
   private yielding = false;
   private yieldTimer = 0;
   /** Positions of other vehicles this frame, used for separation checks. */
@@ -293,9 +297,12 @@ export class Robotaxi {
    */
   private wouldCollide(candidate: THREE.Vector3): boolean {
     for (const other of this.nearby) {
-      if (Math.hypot(candidate.x - other.x, candidate.z - other.z) < MIN_SEPARATION) {
-        return true;
-      }
+      const next = Math.hypot(candidate.x - other.x, candidate.z - other.z);
+      if (next >= MIN_SEPARATION) continue;
+      // Only refuse steps that close the gap, so the taxi can always move out
+      // of a tight spot rather than being frozen by a car already beside it.
+      const now = Math.hypot(this.position.x - other.x, this.position.z - other.z);
+      if (next < now) return true;
     }
     return false;
   }
@@ -367,11 +374,11 @@ export class Robotaxi {
 
   /** Head back the way it came, to escape traffic while free-roaming. */
   private turnAway(): void {
-    const alternatives = this.graph
-      .neighbors(this.lastNodeId)
-      .filter((id) => id !== this.targetNodeId);
-    if (alternatives.length === 0) return;
-    this.targetNodeId = alternatives[Math.floor(this.rng() * alternatives.length)];
+    // Turn back along the road already being travelled. Aiming at a different
+    // neighbour of the node behind would cut a straight line across the block.
+    const cameFrom = this.lastNodeId;
+    this.lastNodeId = this.targetNodeId;
+    this.targetNodeId = cameFrom;
     this.mode = "paused";
     this.pauseTimer = DRIVE.nodePauseSeconds;
   }
@@ -460,10 +467,12 @@ export class Robotaxi {
         this.mode = "driving";
         break;
       case "creep_forward":
+        this.doorsOpen = false;
         this.creepRemaining = command.parameters.distance_m ?? DRIVE.creepDefaultMeters;
         this.mode = "creeping";
         break;
       case "back_up":
+        this.doorsOpen = false;
         this.backRemaining = command.parameters.distance_m ?? DRIVE.backupDefaultMeters;
         this.mode = "backing";
         break;
@@ -500,6 +509,7 @@ export class Robotaxi {
     this.goalNodeId = nodeId;
     this.destinationName = name;
     this.arrived = false;
+    this.doorsOpen = false;
     const path = this.graph.route(this.lastNodeId, nodeId);
     this.targetNodeId =
       path.length >= 2 ? path[1] : this.pickNextNode(this.lastNodeId, this.lastNodeId);
@@ -527,6 +537,7 @@ export class Robotaxi {
   private flashDoors(): void {
     this.doorFlashTimer = 1.6;
     this.doorsOpen = true;
+    this.doorHoldTimer = DOOR_HOLD_SECONDS;
   }
 
   /** Close the doors again, used once a rider has climbed in. */
@@ -545,6 +556,17 @@ export class Robotaxi {
    * @param dt - Delta time in seconds.
    */
   private updateDoors(dt: number): void {
+    // A car that is moving must not be holding its doors open, and doors left
+    // open with nobody boarding should shut themselves rather than stay ajar.
+    if (this.doorsOpen) {
+      if (this.isMoving) {
+        this.doorsOpen = false;
+      } else {
+        this.doorHoldTimer -= dt;
+        if (this.doorHoldTimer <= 0) this.doorsOpen = false;
+      }
+    }
+
     const target = this.doorsOpen ? 1 : 0;
     const speed = 2.6;
     if (this.doorOpenAmount < target) {
@@ -572,6 +594,16 @@ export class Robotaxi {
       mat.emissive = new THREE.Color(0x8ef6e4);
       mat.emissiveIntensity = pulse * 1.4;
     }
+  }
+
+  /** Whether the car is under way, in any of its moving modes. */
+  private get isMoving(): boolean {
+    return (
+      this.mode === "driving" ||
+      this.mode === "creeping" ||
+      this.mode === "backing" ||
+      this.mode === "paused"
+    );
   }
 
   /** Human-readable label describing what the car is currently doing. */

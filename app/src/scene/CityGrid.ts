@@ -31,6 +31,11 @@ export class CityGrid {
   /** The intersection lattice, built once the tile size is known. */
   graph!: WaypointGraph;
   readonly root = new THREE.Group();
+  /**
+   * Where each building stands and how tall it ended up, so signage can be
+   * mounted on the buildings themselves rather than hovering over the road.
+   */
+  readonly buildings: { position: THREE.Vector3; top: number }[] = [];
 
   private readonly rng = mulberry32(0x1a2b3c);
 
@@ -141,6 +146,12 @@ export class CityGrid {
     this.settleOnGround(building);
     lightWindows(building);
     this.root.add(building);
+
+    const placed = new THREE.Box3().setFromObject(building);
+    this.buildings.push({
+      position: new THREE.Vector3(pos.x, 0, pos.z),
+      top: placed.max.y,
+    });
   }
 
   /**
