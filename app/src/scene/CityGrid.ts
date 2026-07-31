@@ -9,9 +9,11 @@ import * as THREE from "three";
 import { AssetLibrary, lightWindows } from "../assets";
 import {
   ASSETS,
+  BUILDING_HEIGHT_JITTER,
   BUILDING_MODELS,
   GRID_TILES,
   PALETTE,
+  PROP_MODELS,
   ROAD_MODELS,
   WORLD,
 } from "../config";
@@ -65,6 +67,7 @@ export class CityGrid {
           await this.placeRoad(ROAD_MODELS.straight, col, row, 0);
         } else {
           await this.placeBuilding(col, row);
+          await this.placeStreetLight(col, row);
         }
       }
     }
@@ -123,9 +126,14 @@ export class CityGrid {
     const size = new THREE.Vector3();
     box.getSize(size);
     const footprint = Math.max(size.x, size.z);
-    const targetFootprint = this.tileSize * 0.72;
+    const targetFootprint = this.tileSize * (0.62 + this.rng() * 0.16);
     const scale = footprint > 0 ? targetFootprint / footprint : 1;
-    building.scale.setScalar(scale);
+
+    // Vary the height per instance so the skyline is not one repeated shape.
+    const stretch =
+      BUILDING_HEIGHT_JITTER.min +
+      this.rng() * (BUILDING_HEIGHT_JITTER.max - BUILDING_HEIGHT_JITTER.min);
+    building.scale.set(scale, scale * stretch, scale);
 
     building.rotation.y = (Math.PI / 2) * Math.floor(this.rng() * 4);
     const pos = this.graph.worldOfTile(col, row);
@@ -133,6 +141,30 @@ export class CityGrid {
     this.settleOnGround(building);
     lightWindows(building);
     this.root.add(building);
+  }
+
+  /**
+   * Put a street light on the corner of a block, so the streets have some
+   * vertical detail at eye level rather than bare kerbs.
+   *
+   * @param col - Tile column of the block.
+   * @param row - Tile row of the block.
+   */
+  private async placeStreetLight(col: number, row: number): Promise<void> {
+    // Only light some corners, so the city does not look regimented.
+    if (this.rng() > 0.55) return;
+    const name = PROP_MODELS[Math.floor(this.rng() * PROP_MODELS.length)];
+    const light = await this.assets.instance(`${ASSETS.roads}/${name}.glb`);
+    light.scale.setScalar(this.tileScale);
+
+    const centre = this.graph.worldOfTile(col, row);
+    const edge = this.tileSize * 0.5;
+    const cornerX = this.rng() < 0.5 ? -edge : edge;
+    const cornerZ = this.rng() < 0.5 ? -edge : edge;
+    light.position.set(centre.x + cornerX, 0, centre.z + cornerZ);
+    light.rotation.y = (Math.PI / 2) * Math.floor(this.rng() * 4);
+    this.settleOnGround(light);
+    this.root.add(light);
   }
 
   /**

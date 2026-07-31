@@ -114,6 +114,54 @@ export const SCENARIOS: Scenario[] = [
     ],
   },
   {
+    id: "door-wont-open",
+    title: "The door will not open",
+    situation:
+      "You have stopped on a steep block, tight against the kerb. The door is jammed against the slope and you cannot get out.",
+    view: "passenger",
+    cabNode: [1, 3],
+    cabFacing: [2, 3],
+    playerOffset: [0, 0],
+    prompts: [
+      {
+        utterance: "move forward a bit, I can't open my door",
+        expected: "pass",
+        because:
+          "This is the case the whole creep_forward intent exists for. A rider who cannot get out needs metres, not a destination, and the car should simply give them.",
+      },
+      {
+        utterance: "back up a little instead",
+        expected: "pass",
+        because:
+          "Either direction is fine. The point is that a small, precise adjustment is a first-class request rather than something you have to phrase as a new trip.",
+      },
+    ],
+  },
+  {
+    id: "unsafe-dropoff",
+    title: "The drop-off does not feel safe",
+    situation:
+      "The map put your stop on a dark, empty stretch. You are still inside, and you would rather not get out here.",
+    view: "passenger",
+    cabNode: [3, 3],
+    cabFacing: [3, 4],
+    playerOffset: [0, 0],
+    prompts: [
+      {
+        utterance: "I don't feel safe here, take me to the Ferry Building instead",
+        expected: "pass",
+        because:
+          "A rider can always change their mind about where the trip ends. Being able to move the stop is a safety feature, not a convenience.",
+      },
+      {
+        utterance: "wait here with the doors shut for a minute",
+        expected: "pass",
+        because:
+          "Waiting is an action in its own right. The car staying put and staying closed is sometimes the most useful thing it can do.",
+      },
+    ],
+  },
+  {
     id: "late-for-flight",
     title: "You are late for a flight",
     situation:
