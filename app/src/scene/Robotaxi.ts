@@ -39,6 +39,11 @@ const REROUTE_AFTER = 2.0;
  * being wide enough that bodies never visibly intersect.
  */
 const MIN_SEPARATION = 2.4;
+/**
+ * How often the taxi carries straight on through a junction when it could turn.
+ * Choosing uniformly made it turn at nearly every corner, which looks aimless.
+ */
+const STRAIGHT_ON_BIAS = 0.72;
 /** How long the doors stay open before shutting themselves again. */
 const DOOR_HOLD_SECONDS = 12;
 
@@ -79,6 +84,10 @@ export class Robotaxi {
   destinationName: string | null = null;
 
   private bodyMaterials: THREE.MeshStandardMaterial[] = [];
+  /** Parts visible only from the driver's seat: bonnet, dash and pillars. */
+  private readonly interior = new THREE.Group();
+  /** The roof sign, hidden when the camera is inside the cabin. */
+  private roofSign: THREE.Mesh | null = null;
   private mesh!: THREE.Group;
 
   /**
@@ -107,6 +116,7 @@ export class Robotaxi {
     tintCarBody(this.mesh, PALETTE.hero);
     this.addRoofSign();
     this.addDoors();
+    this.addInterior();
     this.mesh.traverse((obj) => {
       const m = obj as THREE.Mesh;
       if (m.isMesh) {
@@ -126,6 +136,69 @@ export class Robotaxi {
     this.heading = headingTo(start.pos, target.pos);
     toLane(start.pos, this.heading, this.position);
     this.syncTransform();
+  }
+
+  /**
+   * Build the bit of the car a rider actually sees from inside.
+   *
+   * The exterior shell is hidden in the passenger view, because sitting inside
+   * a car you cannot see its outside. That left the view floating in mid air
+   * with no sense of being in a vehicle at all, so this adds the parts you
+   * would really see over the dashboard: the bonnet ahead, a dark dash below,
+   * and the window pillars at the edges of vision.
+   */
+  private addInterior(): void {
+    const box = new THREE.Box3().setFromObject(this.mesh);
+    const size = new THREE.Vector3();
+    box.getSize(size);
+
+    const bodyPaint = new THREE.MeshStandardMaterial({
+      color: PALETTE.hero,
+      roughness: 0.5,
+      metalness: 0.3,
+    });
+    const trim = new THREE.MeshStandardMaterial({
+      color: 0x1b1f28,
+      roughness: 0.85,
+      metalness: 0.05,
+    });
+
+    // Everything here is sized against the seated eye point at about 1.15 m.
+    // Only the bonnet and a shallow dash are modelled: pillars close enough to
+    // frame the view are also close enough to block most of it, so they are
+    // left out rather than dominating the windscreen.
+    const halfWidth = size.x * 0.46;
+
+    const bonnet = new THREE.Mesh(
+      new THREE.BoxGeometry(halfWidth * 1.85, 0.07, 1.9),
+      bodyPaint
+    );
+    bonnet.position.set(0, 0.58, 2.5);
+    bonnet.rotation.x = -0.04;
+    this.interior.add(bonnet);
+
+    const dash = new THREE.Mesh(
+      new THREE.BoxGeometry(halfWidth * 1.8, 0.13, 0.38),
+      trim
+    );
+    dash.position.set(0, 0.68, 1.2);
+    dash.rotation.x = 0.14;
+    this.interior.add(dash);
+
+    this.interior.visible = false;
+    this.root.add(this.interior);
+  }
+
+  /**
+   * Show either the outside of the car or the inside of it, never both.
+   *
+   * @param inside - True when the camera is riding in the cabin.
+   */
+  setInteriorView(inside: boolean): void {
+    this.mesh.visible = !inside;
+    this.interior.visible = inside;
+    for (const hinge of this.doorHinges) hinge.visible = !inside;
+    if (this.roofSign) this.roofSign.visible = !inside;
   }
 
   /**
@@ -165,6 +238,7 @@ export class Robotaxi {
     );
     sign.position.set(0, box.max.y + 0.2, 0);
     sign.castShadow = true;
+    this.roofSign = sign;
     this.root.add(sign);
   }
 
@@ -212,11 +286,29 @@ export class Robotaxi {
    * @returns The chosen next node id.
    */
   private pickNextNode(fromId: string, cameFromId: string): string {
-    const neighbors = this.graph.neighbors(fromId);
-    const forward = neighbors.filter((n) => n !== cameFromId);
-    const choices = forward.length > 0 ? forward : neighbors;
-    return choices[Math.floor(this.rng() * choices.length)];
+    const neighbours = this.graph.neighbors(fromId);
+    const forward = neighbours.filter((id) => id !== cameFromId);
+    if (forward.length === 0) return neighbours[0];
+
+    // Prefer carrying straight on. Choosing uniformly at random meant a turn at
+    // roughly every junction, which reads as an indecisive car rather than one
+    // going somewhere.
+    const from = this.graph.node(fromId)!;
+    const came = this.graph.node(cameFromId);
+    if (came && came !== from) {
+      const arrivalHeading = headingTo(came.pos, from.pos);
+      const straight = forward.find((id) => {
+        const next = this.graph.node(id)!;
+        let delta = headingTo(from.pos, next.pos) - arrivalHeading;
+        while (delta > Math.PI) delta -= Math.PI * 2;
+        while (delta < -Math.PI) delta += Math.PI * 2;
+        return Math.abs(delta) < 0.3;
+      });
+      if (straight && this.rng() < STRAIGHT_ON_BIAS) return straight;
+    }
+    return forward[Math.floor(this.rng() * forward.length)];
   }
+
 
   /**
    * Advance the simulation by one frame.

@@ -172,10 +172,8 @@ export class Simulation {
     this.actorRole = mode === "pedestrian" ? "external" : "passenger";
     this.cameras.setMode(mode);
     this.overlay.setViewMode(mode, keepExamples);
-    // You cannot see the outside of the car you are sitting in.
-    if (this.car) {
-      this.car.root.visible = mode !== "passenger";
-    }
+    // Show the cabin from inside and the shell from outside, never both.
+    this.car?.setInteriorView(mode === "passenger");
   }
 
   /** Send the taxi to pick the player up wherever they are standing. */
