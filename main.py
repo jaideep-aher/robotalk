@@ -15,7 +15,7 @@ from __future__ import annotations
 import argparse
 from typing import List, Optional
 
-from scripts import make_dataset, validate_dataset
+from scripts import evaluate, finetune, make_dataset, validate_dataset
 
 
 def _add_make_dataset_parser(subparsers: argparse._SubParsersAction) -> None:
@@ -58,6 +58,42 @@ def _add_validate_parser(subparsers: argparse._SubParsersAction) -> None:
     parser.add_argument("--seed", type=int, default=7)
 
 
+def _add_finetune_parser(subparsers: argparse._SubParsersAction) -> None:
+    """Register the ``finetune`` subcommand.
+
+    Args:
+        subparsers: The subparser registry to add to.
+    """
+
+    parser = subparsers.add_parser(
+        "finetune", help="Prepare, launch, or poll the OpenAI fine-tune job."
+    )
+    parser.add_argument(
+        "action", choices=["prepare", "launch", "poll"], help="Fine-tune step."
+    )
+    parser.add_argument("--model", default=finetune.BASE_MODEL)
+    parser.add_argument("--suffix", default="robotalk")
+    parser.add_argument("--job-id", default=None)
+    parser.add_argument("--interval", type=float, default=30.0)
+    parser.add_argument("--once", action="store_true")
+
+
+def _add_evaluate_parser(subparsers: argparse._SubParsersAction) -> None:
+    """Register the ``evaluate`` subcommand.
+
+    Args:
+        subparsers: The subparser registry to add to.
+    """
+
+    parser = subparsers.add_parser(
+        "evaluate", help="Evaluate base and/or fine-tuned models on the test set."
+    )
+    parser.add_argument("--models", default="base")
+    parser.add_argument("--limit", type=int, default=None)
+    parser.add_argument("--no-judge", action="store_true")
+    parser.add_argument("--judge-sample", type=int, default=30)
+
+
 def build_parser() -> argparse.ArgumentParser:
     """Build the top-level argument parser with all subcommands.
 
@@ -69,6 +105,8 @@ def build_parser() -> argparse.ArgumentParser:
     subparsers = parser.add_subparsers(dest="command", required=True)
     _add_make_dataset_parser(subparsers)
     _add_validate_parser(subparsers)
+    _add_finetune_parser(subparsers)
+    _add_evaluate_parser(subparsers)
     return parser
 
 
@@ -104,6 +142,27 @@ def main(argv: Optional[List[str]] = None) -> int:
             Path(args.test),
             num_samples=args.samples,
             seed=args.seed,
+        )
+        return 0
+
+    if args.command == "finetune":
+        if args.action == "prepare":
+            finetune.run_prepare(model=args.model)
+        elif args.action == "launch":
+            finetune.launch(model=args.model, suffix=args.suffix)
+        elif args.action == "poll":
+            if not args.job_id:
+                parser.error("finetune poll requires --job-id")
+            finetune.poll(args.job_id, interval_s=args.interval, once=args.once)
+        return 0
+
+    if args.command == "evaluate":
+        names = [n.strip() for n in args.models.split(",") if n.strip()]
+        evaluate.evaluate(
+            model_names=names,
+            limit=args.limit,
+            do_judge=not args.no_judge,
+            judge_sample=args.judge_sample,
         )
         return 0
 
