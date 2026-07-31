@@ -11,6 +11,7 @@ import { ASSETS, NPC_CAR_MODELS, WORLD } from "../config";
 import type { WaypointGraph } from "./WaypointGraph";
 
 import { CAR_FORWARD_OFFSET } from "./carOrientation";
+import { blocksAhead, headingTo, toLane } from "./lanes";
 
 const NPC_SPEED = 5.0; // metres per second
 /**
@@ -19,7 +20,6 @@ const NPC_SPEED = 5.0; // metres per second
  * 4.6 m car length so they never visually overlap.
  */
 const FOLLOW_DISTANCE = 6.0;
-const FORWARD_CONE = 0.75; // cos of the half-angle counted as "ahead"
 const NODE_PAUSE = 0.6; // seconds paused at each intersection
 /**
  * After waiting this long behind someone, pick a different street. Rerouting
@@ -32,7 +32,13 @@ const REROUTE_AFTER = 2.0;
  * 4.6 m car length so bodies never visually intersect, whatever the yielding
  * logic decides.
  */
-const MIN_SEPARATION = 5.2;
+/**
+ * Hard floor on the gap between vehicle centres. Kept below the 2.83 m that
+ * separates perpendicular lane entries at an intersection, so cars crossing
+ * from different streets are not permanently frozen by each other, while still
+ * being wide enough that bodies never visibly intersect.
+ */
+const MIN_SEPARATION = 2.4;
 
 /** One NPC vehicle driving the graph. */
 interface NpcCar {
@@ -104,6 +110,7 @@ export class NpcTraffic {
         progress: 0,
         blockedFor: 0,
       };
+      this.seatInLane(car);
       this.settle(car);
       this.root.add(group);
       this.cars.push(car);
@@ -175,20 +182,13 @@ export class NpcTraffic {
    * @returns True if the car should hold.
    */
   private blockedAhead(car: NpcCar, heroPosition?: THREE.Vector3): boolean {
-    const forward = new THREE.Vector3(Math.sin(car.heading), 0, Math.cos(car.heading));
     const others = this.cars
       .filter((o) => o !== car)
       .map((o) => o.position)
       .concat(heroPosition ? [heroPosition] : []);
 
     for (const other of others) {
-      const toOther = new THREE.Vector3().subVectors(other, car.position);
-      toOther.y = 0;
-      const distance = toOther.length();
-      if (distance < 0.001 || distance > FOLLOW_DISTANCE) continue;
-      // Only yield to what is genuinely in front, so cars are not deadlocked
-      // by a vehicle sitting beside or behind them.
-      if (toOther.normalize().dot(forward) > FORWARD_CONE) {
+      if (blocksAhead(car.position, car.heading, other, FOLLOW_DISTANCE)) {
         return true;
       }
     }
@@ -203,15 +203,19 @@ export class NpcTraffic {
    */
   private advance(car: NpcCar, dt: number, heroPosition?: THREE.Vector3): void {
     const target = this.graph.node(car.targetNodeId)!;
-    const toTarget = new THREE.Vector3().subVectors(target.pos, car.position);
+    const from = this.graph.node(car.lastNodeId)!;
+    // Aim at the right-hand lane of the edge being travelled, not its centre.
+    const edgeHeading = headingTo(from.pos, target.pos);
+    const laneTarget = toLane(target.pos, edgeHeading);
+    const toTarget = new THREE.Vector3().subVectors(laneTarget, car.position);
     const distance = toTarget.length();
     const step = NPC_SPEED * dt;
 
     if (distance <= step || distance < 0.05) {
       // Arriving still has to respect separation, or cars converging on an
       // intersection from different streets would land on the same node.
-      if (this.wouldCollide(car, target.pos, heroPosition)) return;
-      car.position.copy(target.pos);
+      if (this.wouldCollide(car, laneTarget, heroPosition)) return;
+      car.position.copy(laneTarget);
       const previous = car.lastNodeId;
       car.lastNodeId = car.targetNodeId;
       car.targetNodeId = this.pickNext(car.targetNodeId, previous);
@@ -262,6 +266,19 @@ export class NpcTraffic {
    */
   private tooClose(a: THREE.Vector3, b: THREE.Vector3): boolean {
     return Math.hypot(a.x - b.x, a.z - b.z) < MIN_SEPARATION;
+  }
+
+  /**
+   * Place a car in its lane at spawn, so it does not begin on the centreline.
+   *
+   * @param car - The car to seat in its lane.
+   */
+  private seatInLane(car: NpcCar): void {
+    const from = this.graph.node(car.lastNodeId)!;
+    const to = this.graph.node(car.targetNodeId)!;
+    const heading = headingTo(from.pos, to.pos);
+    car.heading = heading;
+    toLane(from.pos, heading, car.position);
   }
 
   /**
