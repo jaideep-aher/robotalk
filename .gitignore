@@ -9,6 +9,9 @@ data/raw/
 # Large binary model artifacts
 models/*.bin
 
+# Account-specific fine-tuned model pointer (written by the fine-tune job)
+models/model_id.txt
+
 # Python
 __pycache__/
 *.py[cod]
