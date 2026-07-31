@@ -84,12 +84,14 @@ def create_app():
             A dict with service status and fine-tuned-model availability.
         """
 
+        import os
         from pathlib import Path
 
         model_id_file = Path(__file__).resolve().parents[1] / "models" / "model_id.txt"
         return {
             "status": "ok",
-            "finetuned_available": model_id_file.exists(),
+            "finetuned_available": bool(os.environ.get("FINETUNED_MODEL_ID"))
+            or model_id_file.exists(),
         }
 
     @app.post("/parse")
