@@ -42,6 +42,7 @@ export class Simulation {
   private viewMode: ViewMode = "passenger";
   private backend: Backend = "base";
   private started = false;
+  private worldReady = false;
 
   /**
    * @param container - The root element to mount the canvas and UI into.
@@ -56,23 +57,14 @@ export class Simulation {
   }
 
   /**
-   * Build the world and show the character-select screen.
+   * Show the UI and start rendering immediately, then load the world in the
+   * background so the user never faces a blank screen while assets download.
    */
   async init(): Promise<void> {
-    await this.city.build();
-    this.scene.scene.add(this.city.root);
-
-    const mid = Math.floor(GRID_BLOCKS / 2);
-    const startNode = `${mid},${mid}`;
-    this.car = new Robotaxi(this.city.graph, this.rng);
-    await this.car.load(this.assets, startNode);
-    this.scene.scene.add(this.car.root);
-
-    this.positionPedestrianCorner();
+    // Interactive UI first: the character-select screen and the render loop
+    // (which draws the dusk sky) appear before any model has to load.
     this.buildOverlay();
-
     void checkHealth().then((h) => this.overlay.setFinetunedAvailable(h.finetunedAvailable));
-
     new CharacterSelect(this.container, (mode) => this.onCharacterChosen(mode));
 
     // Development-only handle for inspecting the scene from the console.
@@ -85,7 +77,20 @@ export class Simulation {
     }
     this.loop();
 
-    // Tier 2 ambient life loads in the background once Tier 1 is interactive.
+    // Build the world in the background; the loop guards on worldReady.
+    await this.city.build();
+    this.scene.scene.add(this.city.root);
+
+    const mid = Math.floor(GRID_BLOCKS / 2);
+    const startNode = `${mid},${mid}`;
+    this.car = new Robotaxi(this.city.graph, this.rng);
+    await this.car.load(this.assets, startNode);
+    this.scene.scene.add(this.car.root);
+
+    this.positionPedestrianCorner();
+    this.worldReady = true;
+
+    // Tier 2 ambient life loads once Tier 1 is interactive.
     void this.loadAmbientLife();
   }
 
@@ -145,7 +150,7 @@ export class Simulation {
     const response = await parseCommand(utterance, this.actorRole, this.backend);
     if (response.ok && response.command) {
       this.overlay.showResult(response, actionDescription(response.command));
-      this.car.applyCommand(response.command);
+      this.car?.applyCommand(response.command);
       speak(response.command.response_speech);
     } else {
       this.overlay.showResult(response, response.error ?? "no action");
@@ -184,7 +189,7 @@ export class Simulation {
   private loop = (): void => {
     requestAnimationFrame(this.loop);
     const dt = Math.min(this.clock.getDelta(), 0.05);
-    if (this.started) {
+    if (this.started && this.worldReady && this.car) {
       this.car.update(dt);
       this.traffic?.update(dt);
       this.pedestrians?.update(dt);
