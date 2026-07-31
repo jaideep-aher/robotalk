@@ -17,7 +17,8 @@ import * as THREE from "three";
 import { AssetLibrary } from "../assets";
 import { ASSETS, GRID_BLOCKS, NPC_CAR_MODELS, WORLD } from "../config";
 import { CAR_FORWARD_OFFSET } from "./carOrientation";
-import { blocksAhead, headingTo, toLane } from "./lanes";
+import { blocksAhead, cornerPoint, headingTo, isTurn, toLane } from "./lanes";
+import type { TrafficSignals } from "./TrafficSignals";
 import { WaypointGraph } from "./WaypointGraph";
 
 const NPC_SPEED = 5.0; // metres per second
@@ -44,6 +45,15 @@ interface NpcCar {
   pauseTimer: number;
   /** Which circuit this car belongs to, so it only follows its own traffic. */
   loopId: number;
+  /** Set while sweeping a corner, cleared once the turn completes. */
+  turn: {
+    entry: THREE.Vector3;
+    corner: THREE.Vector3;
+    exit: THREE.Vector3;
+    exitHeading: number;
+    progress: number;
+    length: number;
+  } | null;
 }
 
 /**
@@ -52,6 +62,17 @@ interface NpcCar {
 export class NpcTraffic {
   readonly root = new THREE.Group();
   private readonly cars: NpcCar[] = [];
+  /** Signals to obey, once the junction heads have been built. */
+  private signals: TrafficSignals | null = null;
+
+  /**
+   * Give the traffic a set of signals to obey.
+   *
+   * @param signals - The junction signal system.
+   */
+  useSignals(signals: TrafficSignals): void {
+    this.signals = signals;
+  }
 
   /**
    * @param graph - The shared waypoint graph.
@@ -122,6 +143,7 @@ export class NpcTraffic {
         legIndex: Math.floor(this.rng() * circuit.length),
         pauseTimer: this.rng() * CORNER_PAUSE,
         loopId: index,
+        turn: null,
       };
       this.seatOnLeg(car);
       this.settle(car);
@@ -188,7 +210,7 @@ export class NpcTraffic {
         this.applyTransform(car);
         continue;
       }
-      if (this.blockedAhead(car, heroPosition)) {
+      if (this.blockedAhead(car, heroPosition) || this.heldAtSignal(car)) {
         this.applyTransform(car);
         continue;
       }
@@ -225,6 +247,29 @@ export class NpcTraffic {
   }
 
   /**
+   * Whether a red or amber signal is holding this car at the junction ahead.
+   *
+   * Only applies close to the stop line. A car already crossing is left to
+   * clear the junction, because stopping halfway across is worse than
+   * finishing the manoeuvre.
+   *
+   * @param car - The car to test.
+   * @returns True if it must wait at the line.
+   */
+  private heldAtSignal(car: NpcCar): boolean {
+    if (!this.signals) return false;
+    const target = this.graph.node(this.nextNodeId(car))!;
+    const distance = Math.hypot(
+      target.pos.x - car.position.x,
+      target.pos.z - car.position.z
+    );
+    // Stop line sits about a car length back from the junction centre.
+    const atLine = distance < WORLD.tileMeters * 0.55 && distance > WORLD.tileMeters * 0.34;
+    if (!atLine) return false;
+    return this.signals.phaseFor(target.id, car.heading) !== "green";
+  }
+
+  /**
    * Move a car along its current leg, turning the corner on arrival.
    *
    * @param car - The car to move.
@@ -232,6 +277,35 @@ export class NpcTraffic {
    * @param heroPosition - The hero robotaxi's position, if known.
    */
   private advance(car: NpcCar, dt: number, heroPosition?: THREE.Vector3): void {
+    const step = NPC_SPEED * dt;
+
+    // Sweeping the corner: follow the curve rather than the straight line to
+    // the next lane point, so the body traces the turn instead of sliding
+    // sideways across the junction.
+    if (car.turn) {
+      car.turn.progress += step / car.turn.length;
+      if (car.turn.progress >= 1) {
+        car.position.copy(car.turn.exit);
+        car.heading = car.turn.exitHeading;
+        car.turn = null;
+        return;
+      }
+      const next = cornerPoint(
+        car.turn.entry,
+        car.turn.corner,
+        car.turn.exit,
+        car.turn.progress
+      );
+      if (this.wouldCollide(car, next, heroPosition)) {
+        car.turn.progress -= step / car.turn.length;
+        return;
+      }
+      // Heading comes from the direction actually travelled along the curve.
+      car.heading = Math.atan2(next.x - car.position.x, next.z - car.position.z);
+      car.position.copy(next);
+      return;
+    }
+
     const from = this.graph.node(car.circuit[car.legIndex])!;
     const to = this.graph.node(this.nextNodeId(car))!;
     const legHeading = headingTo(from.pos, to.pos);
@@ -239,12 +313,35 @@ export class NpcTraffic {
 
     const toTarget = new THREE.Vector3().subVectors(laneTarget, car.position);
     const distance = toTarget.length();
-    const step = NPC_SPEED * dt;
 
     if (distance <= step || distance < 0.05) {
-      car.position.copy(laneTarget);
-      car.legIndex = (car.legIndex + 1) % car.circuit.length;
-      car.pauseTimer = CORNER_PAUSE;
+      // Arrived at the junction. Set up the swept corner onto the next leg.
+      const afterIndex = (car.legIndex + 1) % car.circuit.length;
+      const after = this.graph.node(
+        car.circuit[(afterIndex + 1) % car.circuit.length]
+      )!;
+      const nextHeading = headingTo(to.pos, after.pos);
+
+      car.legIndex = afterIndex;
+
+      if (isTurn(legHeading, nextHeading)) {
+        const exit = toLane(to.pos, nextHeading).addScaledVector(
+          new THREE.Vector3(Math.sin(nextHeading), 0, Math.cos(nextHeading)),
+          WORLD.tileMeters * 0.5
+        );
+        const entry = car.position.clone();
+        car.turn = {
+          entry,
+          corner: to.pos.clone(),
+          exit,
+          exitHeading: nextHeading,
+          progress: 0,
+          // Rough curve length, good enough to keep the sweep at cruise speed.
+          length: entry.distanceTo(to.pos) + to.pos.distanceTo(exit),
+        };
+      } else {
+        car.position.copy(laneTarget);
+      }
       return;
     }
 

@@ -31,7 +31,9 @@ export const PALETTE = {
  * metre everywhere else (speeds, fog, distances from the schema).
  */
 export const WORLD = {
-  tileMeters: 8,
+  // Roads are three car widths across, so an intersection is wide enough for a
+  // vehicle to turn through it without clipping the kerb or the oncoming lane.
+  tileMeters: 13,
   carLengthMeters: 4.6,
 } as const;
 
