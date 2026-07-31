@@ -22,6 +22,7 @@ type Mode =
 
 import { CAR_FORWARD_OFFSET } from "./carOrientation";
 import { blocksAhead, headingTo, toLane } from "./lanes";
+import type { TrafficSignals } from "./TrafficSignals";
 
 /**
  * Stop this far short of a vehicle sitting directly ahead. Kept well under the
@@ -76,6 +77,38 @@ export class Robotaxi {
   private yieldTimer = 0;
   /** Positions of other vehicles this frame, used for separation checks. */
   private nearby: THREE.Vector3[] = [];
+  /** Junction signals to obey, once they exist. */
+  private signals: TrafficSignals | null = null;
+
+  /**
+   * Give the taxi a set of signals to obey.
+   *
+   * @param signals - The junction signal system.
+   */
+  useSignals(signals: TrafficSignals | null): void {
+    this.signals = signals;
+  }
+
+  /**
+   * Whether a red or amber is holding the taxi at the junction ahead.
+   *
+   * A car already inside the junction carries on, because stopping across it
+   * is worse than clearing it.
+   *
+   * @returns True if the taxi should wait at the line.
+   */
+  private heldAtSignal(): boolean {
+    if (!this.signals || this.goalNodeId === this.targetNodeId) return false;
+    const target = this.graph.node(this.targetNodeId);
+    if (!target) return false;
+    const distance = Math.hypot(
+      target.pos.x - this.position.x,
+      target.pos.z - this.position.z
+    );
+    const atLine = distance < WORLD.tileMeters * 0.55 && distance > WORLD.tileMeters * 0.34;
+    if (!atLine) return false;
+    return this.signals.phaseFor(target.id, this.heading) !== "green";
+  }
   /** Set for one read when the taxi reaches its requested destination. */
   arrived = false;
   /** Node the taxi is currently routing to, if a destination was set. */
@@ -325,7 +358,7 @@ export class Robotaxi {
     // Always yield to whatever is directly ahead. The taxi never drives
     // through another vehicle; if the wait drags on while free-roaming it
     // turns down a different street instead.
-    this.yielding = this.shouldYield(traffic);
+    this.yielding = this.shouldYield(traffic) || this.heldAtSignal();
     if (this.yielding) {
       this.yieldTimer += dt;
       if (this.yieldTimer > REROUTE_AFTER && !this.goalNodeId) {

@@ -29,7 +29,12 @@ export class Landing {
 
         <div class="lp-masthead">
           <span class="lp-wordmark">robotalk</span>
-          <span class="lp-masthead-note">AIPI 540 &middot; Module 4</span>
+          <div class="lp-byline">
+            <span class="lp-byline-text">Built by Jaideep Aher</span>
+            <a class="lp-portfolio" href="https://aher.dev" target="_blank" rel="noopener">
+              aher.dev
+            </a>
+          </div>
         </div>
 
         <header class="lp-hero">
@@ -293,7 +298,7 @@ export class Landing {
 
         <footer class="lp-footer">
           <a href="https://github.com/jaideep-aher/robotalk" target="_blank" rel="noopener">Source on GitHub</a>
-          <span>Jaideep Aher, AIPI 540</span>
+          <span>Built by <a href="https://aher.dev" target="_blank" rel="noopener">Jaideep Aher</a>, AIPI 540</span>
         </footer>
       </div>
     `;
