@@ -21,8 +21,18 @@ const NPC_SPEED = 5.0; // metres per second
 const FOLLOW_DISTANCE = 6.0;
 const FORWARD_CONE = 0.75; // cos of the half-angle counted as "ahead"
 const NODE_PAUSE = 0.6; // seconds paused at each intersection
-/** Give up waiting after this long, so two cars cannot deadlock each other. */
-const BLOCK_TIMEOUT = 2.5;
+/**
+ * After waiting this long behind someone, pick a different street. Rerouting
+ * (rather than driving on) is what keeps traffic from gridlocking without ever
+ * letting two cars occupy the same space.
+ */
+const REROUTE_AFTER = 2.0;
+/**
+ * Hard floor on the distance between two vehicle centres. Slightly above the
+ * 4.6 m car length so bodies never visually intersect, whatever the yielding
+ * logic decides.
+ */
+const MIN_SEPARATION = 5.2;
 
 /** One NPC vehicle driving the graph. */
 interface NpcCar {
@@ -137,15 +147,18 @@ export class NpcTraffic {
         continue;
       }
       if (this.blockedAhead(car, heroPosition)) {
+        // Never drive through the vehicle ahead. Wait, and if the wait drags
+        // on, turn down a different street instead so traffic cannot gridlock.
         car.blockedFor += dt;
-        if (car.blockedFor < BLOCK_TIMEOUT) {
-          this.applyTransform(car);
-          continue;
+        if (car.blockedFor > REROUTE_AFTER) {
+          car.blockedFor = 0;
+          this.turnAway(car);
         }
-      } else {
-        car.blockedFor = 0;
+        this.applyTransform(car);
+        continue;
       }
-      this.advance(car, dt);
+      car.blockedFor = 0;
+      this.advance(car, dt, heroPosition);
       this.applyTransform(car);
     }
   }
@@ -188,13 +201,16 @@ export class NpcTraffic {
    * @param car - The car to move.
    * @param dt - Delta time in seconds.
    */
-  private advance(car: NpcCar, dt: number): void {
+  private advance(car: NpcCar, dt: number, heroPosition?: THREE.Vector3): void {
     const target = this.graph.node(car.targetNodeId)!;
     const toTarget = new THREE.Vector3().subVectors(target.pos, car.position);
     const distance = toTarget.length();
     const step = NPC_SPEED * dt;
 
     if (distance <= step || distance < 0.05) {
+      // Arriving still has to respect separation, or cars converging on an
+      // intersection from different streets would land on the same node.
+      if (this.wouldCollide(car, target.pos, heroPosition)) return;
       car.position.copy(target.pos);
       const previous = car.lastNodeId;
       car.lastNodeId = car.targetNodeId;
@@ -204,10 +220,66 @@ export class NpcTraffic {
       return;
     }
     toTarget.normalize();
-    car.position.addScaledVector(toTarget, step);
+
+    // Try the step, and simply do not take it if it would close inside another
+    // vehicle. This is the hard guarantee that nothing ever overlaps, whatever
+    // the higher-level yielding logic decides.
+    const tentative = car.position.clone().addScaledVector(toTarget, step);
+    if (this.wouldCollide(car, tentative, heroPosition)) return;
+
+    car.position.copy(tentative);
     car.progress += step;
     const desired = Math.atan2(toTarget.x, toTarget.z);
     car.heading = this.steer(car.heading, desired, dt);
+  }
+
+  /**
+   * Whether moving a car to a position would put it inside another vehicle.
+   *
+   * @param car - The car being moved.
+   * @param candidate - The position it wants to occupy.
+   * @param heroPosition - The hero taxi's position, if known.
+   * @returns True if the move must be refused.
+   */
+  private wouldCollide(
+    car: NpcCar,
+    candidate: THREE.Vector3,
+    heroPosition?: THREE.Vector3
+  ): boolean {
+    for (const other of this.cars) {
+      if (other === car) continue;
+      if (this.tooClose(candidate, other.position)) return true;
+    }
+    return heroPosition ? this.tooClose(candidate, heroPosition) : false;
+  }
+
+  /**
+   * Whether two vehicle centres are closer than one car length.
+   *
+   * @param a - First position.
+   * @param b - Second position.
+   * @returns True if they would visibly overlap.
+   */
+  private tooClose(a: THREE.Vector3, b: THREE.Vector3): boolean {
+    return Math.hypot(a.x - b.x, a.z - b.z) < MIN_SEPARATION;
+  }
+
+  /**
+   * Retarget a stuck car down a different street so traffic cannot gridlock.
+   *
+   * The car is never teleported, only re-aimed; moving it could place it
+   * inside another vehicle, which is exactly what this system must prevent.
+   *
+   * @param car - The blocked car.
+   */
+  private turnAway(car: NpcCar): void {
+    const alternatives = this.graph
+      .neighbors(car.lastNodeId)
+      .filter((id) => id !== car.targetNodeId);
+    if (alternatives.length === 0) return;
+    car.targetNodeId = alternatives[Math.floor(this.rng() * alternatives.length)];
+    car.progress = 0;
+    car.pauseTimer = NODE_PAUSE;
   }
 
   /**
