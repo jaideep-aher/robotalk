@@ -27,6 +27,11 @@ export class Landing {
     this.element.innerHTML = `
       <div class="lp-doc">
 
+        <div class="lp-masthead">
+          <span class="lp-wordmark">robotalk</span>
+          <span class="lp-masthead-note">AIPI 540 &middot; Module 4</span>
+        </div>
+
         <header class="lp-hero">
           <p class="lp-eyebrow">Fine-tuned language model</p>
           <h1 class="lp-h1">Nobody is driving, so nobody is listening.</h1>
@@ -36,10 +41,10 @@ export class Landing {
               all from anyone else. Every request a driver used to handle with a
               wave or a word now has no way in.
             </p>
-            <p class="lp-lede">
-              robotalk gives the car that missing ear. Speech becomes a checked
-              JSON command, and a safety gate decides whether to act, refuse, or
-              ask, based on who is speaking.
+            <p class="lp-thesis">
+              <span class="lp-mark">robotalk</span> gives the car that missing
+              ear. Speech becomes a checked JSON command, and a safety gate
+              decides whether to act, refuse, or ask, based on who is speaking.
             </p>
             <button class="lp-cta">Open the simulator</button>
             <p class="lp-fine">
@@ -148,40 +153,50 @@ export class Landing {
 
         <section class="lp-band lp-band-tint">
           <p class="lp-eyebrow">Why it did not already exist</p>
-          <h2 class="lp-h2">Cars talk to the street. The street cannot talk back.</h2>
+          <h2 class="lp-h2">The car can be signalled. It cannot be asked.</h2>
           <div class="lp-split">
             <div class="lp-split-left">
               <p class="lp-body-sm lp-body-quiet">
-                External interfaces on autonomous vehicles today run one way, or
-                through a credentialed channel.
+                Robotaxis do take input from outside. In every shipping case,
+                either the input is not language, or the deciding is done by a
+                person somewhere else.
               </p>
             </div>
             <div class="lp-split-right">
               <dl class="lp-defs">
-                <dt>Outward signalling</dt>
+                <dt>Signals out</dt>
                 <dd>
-                  Lights, screens and speakers that tell a pedestrian what the
-                  car is about to do. Information leaves the car. Nothing comes
-                  back.
+                  Lightbars, screens and speakers tell people nearby what the car
+                  is about to do. Useful, and entirely one directional.
                 </dd>
-                <dt>First responder protocols</dt>
+                <dt>Fixed signals in</dt>
                 <dd>
-                  Police and fire crews get documented procedures and a support
-                  line. It works because they are credentialed and trained, which
-                  is exactly what an ordinary bystander is not.
+                  A Waymo reads first responder hand signals on board, and cars
+                  yield to sirens and cones. This is real interpretation of a
+                  person outside, but from a closed vocabulary of gestures, with
+                  no notion of who is making them or whether they may.
                 </dd>
-                <dt>Remote assistance</dt>
+                <dt>A human decides</dt>
                 <dd>
-                  A person can end up speaking to a human operator. That is a
-                  call centre reached through a car, not the car deciding
-                  anything.
+                  Zoox puts two way audio on the doors and Waymo publishes a
+                  support line. You are talking to a remote employee through the
+                  car, and that employee makes the call, not the vehicle.
                 </dd>
               </dl>
               <p class="lp-body">
-                What is missing is the ordinary case: someone with no
-                credentials and no app says a normal sentence, and the vehicle
-                works out whether they are entitled to what they asked for. That
-                is the piece robotalk builds.
+                So the missing piece is narrow and specific. No robotaxi in
+                commercial service takes an ordinary spoken sentence from someone
+                it does not know and works out for itself whether that person is
+                entitled to what they asked for. That judgement is the thing this
+                project builds, and it is why the speaker's role has to live in
+                the output rather than in a policy wrapped around it.
+              </p>
+              <p class="lp-body-sm lp-body-quiet">
+                Others have seen the same hole. The idea of authenticating a
+                spoken instruction from outside a vehicle is already patented and
+                studied. It is not shipping, and the interesting part is the part
+                nobody ships: deciding entitlement rather than just recognising
+                words.
               </p>
             </div>
           </div>
@@ -223,6 +238,48 @@ export class Landing {
             same generator as the training data. Real speech is drunk, panicked,
             accented and interrupted, and none of that is in here.
           </p>
+        </section>
+
+        <section class="lp-band lp-band-tint">
+          <p class="lp-eyebrow">What would have to change to ship it</p>
+          <h2 class="lp-h2">A car at a junction cannot wait on a data centre</h2>
+          <div class="lp-split">
+            <div class="lp-split-left">
+              <p class="lp-body-sm lp-body-quiet">
+                Fine-tuning a hosted model was the right call for answering the
+                research question. It is the wrong shape for the vehicle.
+              </p>
+            </div>
+            <div class="lp-split-right">
+              <p class="lp-body">
+                Everything here runs through an API call. That is fine for
+                measuring whether the idea works, and it is what let me compare
+                a tuned model against its base on the same held out split. It
+                would not survive contact with a real car. A robotaxi holding up
+                traffic while it waits on a round trip, or losing the ability to
+                refuse a stranger because it is in a car park with no signal, is
+                not an edge case. It is Tuesday.
+              </p>
+              <p class="lp-body">
+                The deployed version of this is a small open-weights model
+                running on the vehicle: a 1 to 3 billion parameter Llama or Qwen,
+                fine-tuned on the same corpus with LoRA, quantised and served on
+                the car's own compute. The task suits it. The output is a short
+                fixed schema rather than open prose, the label space is nine
+                intents and three verdicts, and the schema validator that made
+                the training data catches a malformed answer at inference time
+                too, so a smaller model's mistakes stay visible rather than
+                silent.
+              </p>
+              <p class="lp-body-sm lp-body-quiet">
+                The safety argument survives the swap, because it lives in the
+                schema and the evaluation rather than in any particular model.
+                Same corpus, same metrics, same held out split. What changes is
+                the number in front of unsafe compliance, and whether it holds up
+                is an empirical question I have not answered here.
+              </p>
+            </div>
+          </div>
         </section>
 
         <section class="lp-band lp-band-close">
