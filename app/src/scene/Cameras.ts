@@ -91,19 +91,26 @@ export class CameraManager {
     }
   }
 
-  /** Ride inside the car, eyes just behind the windshield, looking ahead. */
+  /**
+   * Ride inside the car, seated behind the windshield looking down the road.
+   *
+   * The hero mesh is hidden while this view is active. A rider sitting inside
+   * cannot see the outside of their own car, and leaving it visible put the
+   * near plane inside the bodywork, which filled the screen with teal.
+   */
   private updatePassenger(car: Robotaxi): void {
     this.tmpForward.set(Math.sin(car.heading), 0, Math.cos(car.heading));
     const base = car.root.position;
+    // Seated eye height, set back slightly from the windshield line.
     this.camera.position.set(
-      base.x + this.tmpForward.x * 0.4,
-      base.y + 1.5,
-      base.z + this.tmpForward.z * 0.4
+      base.x - this.tmpForward.x * 0.35,
+      base.y + 1.15,
+      base.z - this.tmpForward.z * 0.35
     );
     this.tmpLook.set(
-      base.x + this.tmpForward.x * 24,
-      base.y + 1.1,
-      base.z + this.tmpForward.z * 24
+      base.x + this.tmpForward.x * 30,
+      base.y + 0.75,
+      base.z + this.tmpForward.z * 30
     );
     this.camera.lookAt(this.tmpLook);
   }

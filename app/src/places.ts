@@ -18,15 +18,39 @@ export interface Place {
   gy: number;
 }
 
-/** San Francisco landmarks, spread around the grid (none on the taxi's start). */
+/**
+ * San Francisco landmarks, one on every intersection of the lattice so there
+ * is always somewhere named to be sent, and a label in view wherever you are.
+ */
 export const PLACES: Place[] = [
   { name: "Golden Gate Bridge", gx: 0, gy: 0 },
+  { name: "Palace of Fine Arts", gx: 1, gy: 0 },
   { name: "Y Combinator", gx: 2, gy: 0 },
+  { name: "Lombard Street", gx: 3, gy: 0 },
   { name: "Corgi Cafe", gx: 4, gy: 0 },
+
+  { name: "Presidio", gx: 0, gy: 1 },
+  { name: "Painted Ladies", gx: 1, gy: 1 },
+  { name: "Coit Tower", gx: 2, gy: 1 },
+  { name: "Chinatown Gate", gx: 3, gy: 1 },
+  { name: "North Beach", gx: 4, gy: 1 },
+
   { name: "Mission Dolores", gx: 0, gy: 2 },
+  { name: "Castro Theatre", gx: 1, gy: 2 },
+  { name: "Union Square", gx: 2, gy: 2 },
+  { name: "Transamerica Pyramid", gx: 3, gy: 2 },
   { name: "Salesforce Tower", gx: 4, gy: 2 },
+
+  { name: "Haight and Ashbury", gx: 0, gy: 3 },
+  { name: "Twin Peaks", gx: 1, gy: 3 },
+  { name: "Dolores Park", gx: 2, gy: 3 },
+  { name: "Moscone Center", gx: 3, gy: 3 },
+  { name: "Embarcadero", gx: 4, gy: 3 },
+
   { name: "Ferry Building", gx: 0, gy: 4 },
+  { name: "Sutro Baths", gx: 1, gy: 4 },
   { name: "Oracle Park", gx: 2, gy: 4 },
+  { name: "Ghirardelli Square", gx: 3, gy: 4 },
   { name: "Fisherman's Wharf", gx: 4, gy: 4 },
 ];
 

@@ -25,6 +25,57 @@ interface SpeechRecognitionLike {
 type SpeechRecognitionCtor = new () => SpeechRecognitionLike;
 
 /**
+ * Voices worth using, best first.
+ *
+ * The default voice a browser picks is usually the oldest and most robotic one
+ * installed. Every modern platform ships something far better, so we look for
+ * those by name and only fall back to the default if none are present.
+ */
+const PREFERRED_VOICES = [
+  "Samantha", // macOS and iOS, natural
+  "Google US English",
+  "Microsoft Aria Online (Natural) - English (United States)",
+  "Microsoft Jenny Online (Natural) - English (United States)",
+  "Ava",
+  "Allison",
+  "Karen",
+  "Moira",
+];
+
+let cachedVoice: SpeechSynthesisVoice | null = null;
+
+/**
+ * Choose the most natural available English voice.
+ *
+ * @returns The chosen voice, or null to let the browser decide.
+ */
+function pickVoice(): SpeechSynthesisVoice | null {
+  if (cachedVoice) return cachedVoice;
+  const voices = window.speechSynthesis.getVoices();
+  if (voices.length === 0) return null;
+
+  for (const name of PREFERRED_VOICES) {
+    const match = voices.find((v) => v.name === name);
+    if (match) {
+      cachedVoice = match;
+      return match;
+    }
+  }
+  // Otherwise prefer any local English voice that is not flagged as novelty.
+  const english = voices.filter((v) => v.lang.startsWith("en"));
+  cachedVoice = english.find((v) => v.localService) ?? english[0] ?? null;
+  return cachedVoice;
+}
+
+// Voice lists load asynchronously in most browsers, so re-pick when they land.
+if ("speechSynthesis" in window) {
+  window.speechSynthesis.addEventListener("voiceschanged", () => {
+    cachedVoice = null;
+    pickVoice();
+  });
+}
+
+/**
  * Speak text aloud, cancelling anything currently being spoken.
  *
  * @param text - The line for the car to say.
@@ -33,8 +84,15 @@ export function speak(text: string): void {
   if (!("speechSynthesis" in window) || !text) return;
   window.speechSynthesis.cancel();
   const utterance = new SpeechSynthesisUtterance(text);
-  utterance.rate = 1.02;
-  utterance.pitch = 1.0;
+  const voice = pickVoice();
+  if (voice) {
+    utterance.voice = voice;
+    utterance.lang = voice.lang;
+  }
+  // Slightly slower and warmer than the default, which reads as less clipped.
+  utterance.rate = 0.96;
+  utterance.pitch = 1.05;
+  utterance.volume = 1;
   window.speechSynthesis.speak(utterance);
 }
 
