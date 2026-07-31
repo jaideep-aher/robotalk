@@ -246,6 +246,27 @@ export class Robotaxi {
     this.steerToward(Math.atan2(toTarget.x, toTarget.z), dt);
   }
 
+  /**
+   * Park the cab at a node facing another, for staging a scenario.
+   *
+   * @param nodeId - Node to sit on.
+   * @param facingNodeId - Node to point towards.
+   */
+  placeAt(nodeId: string, facingNodeId: string): void {
+    const node = this.graph.node(nodeId);
+    const facing = this.graph.node(facingNodeId);
+    if (!node || !facing) return;
+    this.position.copy(node.pos);
+    this.heading = Math.atan2(facing.pos.x - node.pos.x, facing.pos.z - node.pos.z);
+    this.lastNodeId = nodeId;
+    this.targetNodeId = facingNodeId;
+    this.goalNodeId = null;
+    this.destinationName = null;
+    this.arrived = false;
+    this.mode = "stopped";
+    this.syncTransform();
+  }
+
   /** Drop any destination and go back to cruising the grid. */
   resumeFreeRoam(): void {
     this.goalNodeId = null;

@@ -9,6 +9,7 @@
  */
 
 import { PLACES } from "../places";
+import { SCENARIOS, type Scenario } from "../scenarios";
 import type { ViewMode } from "../scene/Cameras";
 import { VIEW_LABELS } from "../scene/Cameras";
 import type { Backend, ParseResponse } from "../types";
@@ -22,6 +23,7 @@ export interface OverlayHandlers {
   onHail: () => void;
   onResume: () => void;
   onPickPlace: (placeName: string) => void;
+  onScenario: (scenarioId: string | null) => void;
 }
 
 /**
@@ -65,7 +67,11 @@ export class Overlay {
   private readonly viewButtons: HTMLButtonElement[] = [];
   private readonly hintEl: HTMLElement;
   private readonly examplesHost: HTMLElement;
+  private readonly situationEl: HTMLElement;
+  private readonly becauseEl: HTMLElement;
   private finetunedAvailable = false;
+  /** Explanation to reveal once the gate answers the current suggested line. */
+  private pendingBecause: string | null = null;
 
   /**
    * @param container - Element to mount into.
@@ -75,6 +81,11 @@ export class Overlay {
     const panel = document.createElement("div");
     panel.className = "overlay";
     panel.innerHTML = `
+      <div class="ov-section">
+        <span class="ov-label">scenario</span>
+        <select class="ov-scenarios"></select>
+        <div class="ov-situation"></div>
+      </div>
       <div class="ov-section">
         <span class="ov-label">point of view</span>
         <div class="ov-views"></div>
@@ -102,6 +113,7 @@ export class Overlay {
         <div class="ov-stage"><span class="ov-label">gate</span><div class="ov-gate">—</div></div>
         <div class="ov-stage"><span class="ov-label">action</span><div class="ov-action">—</div></div>
         <div class="ov-stage"><span class="ov-label">car says</span><div class="ov-speech">—</div></div>
+        <div class="ov-because"></div>
       </div>
     `;
     container.appendChild(panel);
@@ -118,6 +130,9 @@ export class Overlay {
     this.hintEl = panel.querySelector(".ov-hint")!;
 
     this.examplesHost = panel.querySelector(".ov-examples")!;
+    this.situationEl = panel.querySelector(".ov-situation")!;
+    this.becauseEl = panel.querySelector(".ov-because")!;
+    this.buildScenarios(panel.querySelector(".ov-scenarios")!);
     this.buildViewSwitcher(panel.querySelector(".ov-views")!);
     this.buildPlaces(panel.querySelector(".ov-places")!);
     this.buildExamples("passenger");
@@ -136,6 +151,59 @@ export class Overlay {
     });
     this.micButton.addEventListener("click", () => this.handlers.onMic());
     this.backendToggle.addEventListener("click", () => this.toggleBackend());
+  }
+
+  /**
+   * Populate the scenario picker.
+   *
+   * @param select - The select element to fill.
+   */
+  private buildScenarios(select: HTMLSelectElement): void {
+    const placeholder = document.createElement("option");
+    placeholder.textContent = "Free roam (no scenario)";
+    placeholder.value = "";
+    select.appendChild(placeholder);
+    for (const scenario of SCENARIOS) {
+      const option = document.createElement("option");
+      option.textContent = scenario.title;
+      option.value = scenario.id;
+      select.appendChild(option);
+    }
+    select.addEventListener("change", () => {
+      this.handlers.onScenario(select.value || null);
+    });
+  }
+
+  /**
+   * Show a loaded scenario: its situation and the lines worth trying, each
+   * labelled with what the gate is expected to do.
+   *
+   * @param scenario - The scenario, or null to return to free roam.
+   */
+  setScenario(scenario: Scenario | null): void {
+    this.becauseEl.textContent = "";
+    this.pendingBecause = null;
+    if (!scenario) {
+      this.situationEl.textContent = "";
+      this.situationEl.classList.remove("ov-situation-on");
+      this.buildExamples("passenger");
+      return;
+    }
+    this.situationEl.textContent = scenario.situation;
+    this.situationEl.classList.add("ov-situation-on");
+
+    this.examplesHost.innerHTML = "";
+    for (const prompt of scenario.prompts) {
+      const chip = document.createElement("button");
+      chip.className = `ov-chip ov-chip-${prompt.expected}`;
+      chip.textContent = prompt.utterance;
+      chip.title = `Expected: ${prompt.expected}`;
+      chip.addEventListener("click", () => {
+        this.pendingBecause = prompt.because;
+        this.handlers.onSubmit(prompt.utterance);
+      });
+      this.examplesHost.appendChild(chip);
+    }
   }
 
   /**
@@ -231,7 +299,7 @@ export class Overlay {
    *
    * @param mode - The active view mode.
    */
-  setViewMode(mode: ViewMode): void {
+  setViewMode(mode: ViewMode, keepExamples = false): void {
     for (const button of this.viewButtons) {
       button.classList.toggle("ov-view-active", button.dataset.mode === mode);
     }
@@ -241,7 +309,10 @@ export class Overlay {
         : mode === "passenger"
           ? "You are riding inside, so you have authority over the trip: destinations, doors, and stops all pass."
           : "Chase view. You still speak as the passenger, so trip commands pass.";
-    this.buildExamples(mode === "pedestrian" ? "external" : "passenger");
+    // A loaded scenario owns the chips, so switching view must not replace them.
+    if (!keepExamples) {
+      this.buildExamples(mode === "pedestrian" ? "external" : "passenger");
+    }
   }
 
   /**
@@ -319,5 +390,15 @@ export class Overlay {
     this.gateEl.className = `ov-gate ov-gate-${command.safety_gate}`;
     this.actionEl.textContent = actionText;
     this.speechEl.textContent = command.response_speech;
+
+    // Reveal why this is the right answer, once the gate has given one.
+    if (this.pendingBecause) {
+      this.becauseEl.textContent = this.pendingBecause;
+      this.becauseEl.classList.add("ov-because-on");
+      this.pendingBecause = null;
+    } else {
+      this.becauseEl.textContent = "";
+      this.becauseEl.classList.remove("ov-because-on");
+    }
   }
 }
