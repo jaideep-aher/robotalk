@@ -86,20 +86,25 @@ the parser does not overfit to one register.
 
 ```
 robotalk/
-  README.md
-  requirements.txt
-  main.py                 # subcommand entry point
-  scripts/
-    schema.py             # Pydantic command schema + validators
-    make_dataset.py       # OpenAI-driven corpus generator
-    validate_dataset.py   # counts, pass rate, random samples
-  models/                 # fine-tuned artifacts (gitignored *.bin)
-  data/
-    raw/                  # gitignored
-    processed/            # train.jsonl, test.jsonl
-    outputs/              # evaluation artifacts
-  notebooks/
+├── README.md             # project overview and run instructions
+├── requirements.txt      # Python dependencies
+├── setup.py              # setup checks and environment guidance
+├── main.py               # command-line entry point and ASGI application
+├── scripts/              # dataset, fine-tuning, evaluation, and server modules
+├── models/               # trained-model metadata and local artifacts
+├── data/
+│   ├── raw/              # downloaded source assets, kept out of Git
+│   ├── processed/        # train/test JSONL splits
+│   └── outputs/          # reproducible evaluation results
+├── notebooks/            # exploration only; not used by the application
+├── app/                  # Vite, TypeScript, and Three.js frontend
+├── Dockerfile            # production build and server image
+└── .gitignore
 ```
+
+Empty directories include a `.gitkeep` file so the expected project layout is
+visible after a fresh clone. Downloaded assets and account-specific model IDs
+remain excluded from Git.
 
 ## Setup
 
