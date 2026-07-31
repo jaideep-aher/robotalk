@@ -9,6 +9,9 @@ data/raw/
 # Large binary model artifacts
 models/*.bin
 
+# Account-specific fine-tuned model pointer (written by the fine-tune job)
+models/model_id.txt
+
 # Python
 __pycache__/
 *.py[cod]
@@ -16,6 +19,15 @@ __pycache__/
 .venv/
 venv/
 .env/
+
+# Web app: dependencies and build output
+app/node_modules/
+app/dist/
+app/.vite/
+
+# The downloaded CC0 models are committed on purpose: they are only ~5 MB and
+# shipping them keeps the deployed build from depending on kenney.nl being up.
+# scripts/setup_assets.py still regenerates them from scratch.
 
 # OS and editor cruft
 .DS_Store

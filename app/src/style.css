@@ -1,0 +1,459 @@
+/* Dusk-themed UI for the robotalk simulator. */
+
+:root {
+  --panel-bg: rgba(24, 21, 38, 0.82);
+  --panel-border: rgba(255, 210, 138, 0.22);
+  --text: #f2ecff;
+  --muted: #a99fc8;
+  --pass: #34d399;
+  --reject: #fb7185;
+  --clarify: #fbbf24;
+  --teal: #14b8a6;
+  font-family: "Inter", system-ui, -apple-system, sans-serif;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  height: 100%;
+  overflow: hidden;
+  background: #14121f;
+  color: var(--text);
+}
+
+#app {
+  position: fixed;
+  inset: 0;
+}
+
+#app canvas {
+  display: block;
+}
+
+/* Character select ------------------------------------------------------- */
+
+.character-select {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: radial-gradient(circle at 50% 30%, #3a2f56 0%, #17131f 70%);
+  z-index: 20;
+}
+
+.cs-inner {
+  text-align: center;
+  max-width: 760px;
+  padding: 24px;
+}
+
+.cs-title {
+  font-size: 54px;
+  margin: 0;
+  letter-spacing: -1px;
+  color: var(--teal);
+  text-shadow: 0 0 24px rgba(20, 184, 166, 0.5);
+}
+
+.cs-sub {
+  color: var(--muted);
+  margin: 8px 0 28px;
+  font-size: 17px;
+}
+
+.cs-cards {
+  display: flex;
+  gap: 20px;
+  justify-content: center;
+  flex-wrap: wrap;
+}
+
+.cs-card {
+  width: 300px;
+  background: var(--panel-bg);
+  border: 1px solid var(--panel-border);
+  border-radius: 16px;
+  padding: 26px 22px;
+  color: var(--text);
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  align-items: center;
+  transition: transform 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.cs-card:hover {
+  transform: translateY(-4px);
+  border-color: var(--teal);
+  box-shadow: 0 14px 40px rgba(0, 0, 0, 0.4);
+}
+
+.cs-emoji {
+  font-size: 44px;
+}
+
+.cs-card-title {
+  font-size: 22px;
+  font-weight: 700;
+}
+
+.cs-card-desc {
+  color: var(--muted);
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.cs-role {
+  margin-top: 6px;
+  font-family: ui-monospace, monospace;
+  font-size: 12px;
+  color: var(--teal);
+  background: rgba(20, 184, 166, 0.12);
+  padding: 4px 10px;
+  border-radius: 999px;
+}
+
+/* Overlay ---------------------------------------------------------------- */
+
+.overlay {
+  position: fixed;
+  left: 16px;
+  bottom: 16px;
+  width: 380px;
+  max-width: calc(100vw - 32px);
+  background: var(--panel-bg);
+  border: 1px solid var(--panel-border);
+  border-radius: 14px;
+  padding: 14px;
+  backdrop-filter: blur(10px);
+  z-index: 10;
+}
+
+.overlay {
+  max-height: calc(100vh - 32px);
+  overflow-y: auto;
+}
+
+.ov-row {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+/* Sections: point of view, ride controls */
+
+.ov-section {
+  margin-bottom: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.ov-views {
+  display: flex;
+  gap: 6px;
+}
+
+.ov-view {
+  flex: 1;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  color: var(--muted);
+  border-radius: 8px;
+  padding: 7px 4px;
+  font-size: 12.5px;
+  cursor: pointer;
+}
+
+.ov-view:hover {
+  border-color: var(--teal);
+  color: var(--text);
+}
+
+.ov-view-active {
+  background: rgba(20, 184, 166, 0.22);
+  border-color: var(--teal);
+  color: #b6fff2;
+  font-weight: 600;
+}
+
+.ov-hint {
+  font-size: 11.5px;
+  color: var(--muted);
+  line-height: 1.4;
+}
+
+.ov-ride {
+  display: flex;
+  gap: 6px;
+}
+
+.ov-hail {
+  flex: 1;
+  background: rgba(20, 184, 166, 0.18);
+  border: 1px solid var(--teal);
+  color: #b6fff2;
+  border-radius: 8px;
+  padding: 8px 10px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.ov-hail:hover {
+  background: rgba(20, 184, 166, 0.3);
+}
+
+.ov-resume {
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  color: var(--text);
+  border-radius: 8px;
+  padding: 8px 12px;
+  font-size: 13px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.ov-resume:hover {
+  border-color: var(--teal);
+}
+
+.ov-places {
+  width: 100%;
+  min-width: 0;
+  background: rgba(0, 0, 0, 0.3);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  color: var(--text);
+  border-radius: 8px;
+  padding: 8px 6px;
+  font-size: 12.5px;
+  cursor: pointer;
+}
+
+.ov-status {
+  font-size: 12.5px;
+  color: #b6fff2;
+}
+
+.ov-examples {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  margin-bottom: 12px;
+}
+
+.ov-chip {
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  color: var(--muted);
+  border-radius: 999px;
+  padding: 4px 9px;
+  font-size: 11.5px;
+  cursor: pointer;
+}
+
+.ov-chip:hover {
+  border-color: var(--teal);
+  color: var(--text);
+}
+
+/* Scenarios */
+
+.ov-scenarios {
+  width: 100%;
+  background: rgba(0, 0, 0, 0.3);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  color: var(--text);
+  border-radius: 8px;
+  padding: 8px;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.ov-situation {
+  font-size: 12.5px;
+  line-height: 1.45;
+  color: var(--muted);
+}
+
+.ov-situation-on {
+  color: #ffd9a8;
+  background: rgba(255, 178, 107, 0.12);
+  border-left: 3px solid var(--clarify);
+  padding: 7px 9px;
+  border-radius: 0 8px 8px 0;
+}
+
+/* Expected-outcome tint on scenario chips */
+.ov-chip-pass {
+  border-color: rgba(52, 211, 153, 0.55);
+  color: #b7f7de;
+}
+
+.ov-chip-reject {
+  border-color: rgba(251, 113, 133, 0.55);
+  color: #ffc8d1;
+}
+
+.ov-chip-clarify {
+  border-color: rgba(251, 191, 36, 0.55);
+  color: #ffe4a8;
+}
+
+.ov-because {
+  display: none;
+}
+
+.ov-because-on {
+  display: block;
+  margin-top: 8px;
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--muted);
+  border-left: 3px solid var(--teal);
+  padding: 7px 9px;
+  background: rgba(20, 184, 166, 0.08);
+  border-radius: 0 8px 8px 0;
+}
+
+.ov-controls {
+  margin-bottom: 12px;
+}
+
+.ov-input {
+  flex: 1;
+  min-width: 0;
+  background: rgba(0, 0, 0, 0.3);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 9px;
+  color: var(--text);
+  padding: 9px 11px;
+  font-size: 14px;
+}
+
+.ov-input:focus {
+  outline: none;
+  border-color: var(--teal);
+}
+
+.ov-send,
+.ov-mic,
+.ov-backend {
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  color: var(--text);
+  border-radius: 9px;
+  padding: 9px 12px;
+  font-size: 14px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.ov-send:hover,
+.ov-mic:hover,
+.ov-backend:hover {
+  border-color: var(--teal);
+}
+
+.ov-backend[data-backend="finetuned"] {
+  background: rgba(20, 184, 166, 0.2);
+  border-color: var(--teal);
+  color: #b6fff2;
+}
+
+.ov-mic-active {
+  background: rgba(251, 113, 133, 0.3);
+  border-color: var(--reject);
+}
+
+.ov-mic:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.ov-shake {
+  animation: shake 0.4s ease;
+}
+
+@keyframes shake {
+  0%, 100% { transform: translateX(0); }
+  25% { transform: translateX(-4px); }
+  75% { transform: translateX(4px); }
+}
+
+.ov-pipeline {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.ov-stage {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.ov-label {
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  color: var(--muted);
+}
+
+.ov-utterance,
+.ov-action,
+.ov-speech {
+  font-size: 14px;
+  line-height: 1.4;
+}
+
+.ov-speech {
+  color: #b6fff2;
+  font-style: italic;
+}
+
+.ov-json {
+  margin: 0;
+  max-height: 108px;
+  overflow: auto;
+  background: rgba(0, 0, 0, 0.35);
+  border-radius: 8px;
+  padding: 8px 10px;
+  font-family: ui-monospace, "SF Mono", monospace;
+  font-size: 11.5px;
+  line-height: 1.45;
+  color: #d7cffa;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.ov-gate {
+  font-size: 14px;
+  font-weight: 600;
+  padding: 6px 10px;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.ov-gate-pass {
+  color: #052e22;
+  background: var(--pass);
+}
+
+.ov-gate-reject {
+  color: #3b0713;
+  background: var(--reject);
+}
+
+.ov-gate-clarify {
+  color: #3a2a02;
+  background: var(--clarify);
+}
