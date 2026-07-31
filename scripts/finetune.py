@@ -32,10 +32,10 @@ try:
         build_user_message,
         serialize_command,
     )
-    from scripts.schema import validate_training_example
+    from scripts.schema import Command, validate_training_example
 except ImportError:  # Executed directly as a file.
     from prompts import INFERENCE_SYSTEM_PROMPT, build_user_message, serialize_command
-    from schema import validate_training_example
+    from schema import Command, validate_training_example
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
@@ -106,8 +106,6 @@ def to_chat_example(row: dict) -> Dict[str, List[dict]]:
         A dict with a ``messages`` list: system, user, assistant.
     """
 
-    from scripts.schema import Command  # local import to avoid cycles at module load
-
     command = Command.model_validate(row["command"])
     return {
         "messages": [
@@ -166,10 +164,32 @@ def estimate_tokens(path: Path = FINETUNE_PATH, model: str = "gpt-4o") -> int:
             encoding = tiktoken.get_encoding("o200k_base")
 
         def count(text: str) -> int:
+            """Count tokens in a string using the real tokenizer.
+
+            Args:
+                text: The string to measure.
+
+            Returns:
+                The exact token count for the selected model.
+            """
+
             return len(encoding.encode(text))
 
     except ImportError:
+
         def count(text: str) -> int:
+            """Approximate a token count without tiktoken installed.
+
+            Four characters per token is the usual rule of thumb for English.
+            It is only used to print a cost estimate, so being close is enough.
+
+            Args:
+                text: The string to measure.
+
+            Returns:
+                The estimated token count, at least one.
+            """
+
             return max(1, len(text) // 4)
 
     per_message_overhead = 3

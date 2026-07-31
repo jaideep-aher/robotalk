@@ -25,6 +25,7 @@ import argparse
 import json
 import os
 import random
+import re
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple
@@ -50,6 +51,26 @@ DEFAULT_MAX_ATTEMPTS = 12
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 PROCESSED_DIR = PROJECT_ROOT / "data" / "processed"
+
+
+def normalise_utterance(utterance: str) -> str:
+    """Reduce an utterance to a comparison key for deduplication.
+
+    Case, punctuation and repeated whitespace are stripped, so that
+    "Unlock the doors, please." and "Unlock the doors please!" collapse to the
+    same key. An earlier version lowercased and trimmed only, which let pairs
+    differing by a comma or a full stop through as distinct rows and allowed two
+    near-duplicates to end up on opposite sides of the train and test split.
+
+    Args:
+        utterance: The raw spoken text.
+
+    Returns:
+        The normalised comparison key.
+    """
+
+    stripped = re.sub(r"[^a-z0-9 ]", " ", utterance.lower())
+    return " ".join(stripped.split())
 
 
 @dataclass(frozen=True)
@@ -384,7 +405,7 @@ class DatasetGenerator:
             except ValidationError:
                 rejected += 1
                 continue
-            key = example.utterance.strip().lower()
+            key = normalise_utterance(example.utterance)
             if key in seen:
                 rejected += 1
                 continue
@@ -500,7 +521,37 @@ def stratified_split(
         train.extend(rows[want_test:])
     rng.shuffle(train)
     rng.shuffle(test)
+
+    # A split is only meaningful if nothing crosses it. Checked rather than
+    # assumed, because the earlier deduplication compared raw lowercased text
+    # and let punctuation-only variants land on both sides.
+    leaked = find_leakage(train, test)
+    if leaked:
+        raise ValueError(
+            f"{len(leaked)} test utterances also appear in train: {leaked[:5]}"
+        )
     return train, test
+
+
+def find_leakage(
+    train: List[TrainingExample], test: List[TrainingExample]
+) -> List[str]:
+    """Find test utterances that also appear in train, ignoring punctuation.
+
+    Args:
+        train: The training split.
+        test: The held out split.
+
+    Returns:
+        The offending test utterances, empty when the split is clean.
+    """
+
+    train_keys = {normalise_utterance(example.utterance) for example in train}
+    return [
+        example.utterance
+        for example in test
+        if normalise_utterance(example.utterance) in train_keys
+    ]
 
 
 def write_jsonl(path: Path, examples: List[TrainingExample]) -> None:
