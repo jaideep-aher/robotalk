@@ -21,6 +21,7 @@ type Mode =
   | "pulled_over";
 
 import { CAR_FORWARD_OFFSET } from "./carOrientation";
+import { blocksAhead, headingTo, toLane } from "./lanes";
 
 /**
  * Stop this far short of a vehicle sitting directly ahead. Kept well under the
@@ -28,12 +29,16 @@ import { CAR_FORWARD_OFFSET } from "./carOrientation";
  * this one, and comfortably above the 4.6 m car length so they never overlap.
  */
 const YIELD_DISTANCE = 6.0;
-/** Cosine of the half-angle counted as "ahead" when yielding. */
-const YIELD_CONE = 0.75;
 /** After waiting this long behind traffic while free-roaming, turn elsewhere. */
 const REROUTE_AFTER = 2.0;
 /** Hard floor on the gap between vehicle centres, above the 4.6 m car length. */
-const MIN_SEPARATION = 5.2;
+/**
+ * Hard floor on the gap between vehicle centres. Kept below the 2.83 m that
+ * separates perpendicular lane entries at an intersection, so cars crossing
+ * from different streets are not permanently frozen by each other, while still
+ * being wide enough that bodies never visibly intersect.
+ */
+const MIN_SEPARATION = 2.4;
 
 /**
  * The hero vehicle. Construct with {@link load}, then drive with {@link update}
@@ -52,6 +57,12 @@ export class Robotaxi {
   private creepRemaining = 0;
   private backRemaining = 0;
   private doorFlashTimer = 0;
+  /** Hinges for the two door panels, animated on unlock. */
+  private readonly doorHinges: THREE.Group[] = [];
+  /** How far the doors are open, 0 shut to 1 fully open. */
+  private doorOpenAmount = 0;
+  /** Whether the doors are currently commanded open. */
+  private doorsOpen = false;
   private yielding = false;
   private yieldTimer = 0;
   /** Positions of other vehicles this frame, used for separation checks. */
@@ -90,6 +101,8 @@ export class Robotaxi {
     const rawLength = Math.max(rawSize.x, rawSize.z) || 1;
     this.mesh.scale.setScalar(WORLD.carLengthMeters / rawLength);
     tintCarBody(this.mesh, PALETTE.hero);
+    this.addRoofSign();
+    this.addDoors();
     this.mesh.traverse((obj) => {
       const m = obj as THREE.Mesh;
       if (m.isMesh) {
@@ -103,12 +116,88 @@ export class Robotaxi {
     this.root.add(this.mesh);
 
     const start = this.graph.node(startNodeId)!;
-    this.position.copy(start.pos);
     this.lastNodeId = startNodeId;
     this.targetNodeId = this.pickNextNode(startNodeId, startNodeId);
     const target = this.graph.node(this.targetNodeId)!;
-    this.heading = Math.atan2(target.pos.x - start.pos.x, target.pos.z - start.pos.z);
+    this.heading = headingTo(start.pos, target.pos);
+    toLane(start.pos, this.heading, this.position);
     this.syncTransform();
+  }
+
+  /**
+   * Put a lit "ROBOTAXI" sign on the roof.
+   *
+   * Without it the hero reads as nothing more than a green car among the other
+   * traffic, which loses the point that this is the driverless one you are
+   * talking to.
+   */
+  private addRoofSign(): void {
+    const canvas = document.createElement("canvas");
+    canvas.width = 512;
+    canvas.height = 128;
+    const ctx = canvas.getContext("2d")!;
+    ctx.fillStyle = "#07201c";
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    ctx.font = "bold 74px Inter, system-ui, sans-serif";
+    ctx.fillStyle = "#7ff0de";
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.fillText("ROBOTAXI", canvas.width / 2, canvas.height / 2 + 4);
+
+    const texture = new THREE.CanvasTexture(canvas);
+    texture.colorSpace = THREE.SRGBColorSpace;
+    const faces = new THREE.MeshStandardMaterial({
+      map: texture,
+      emissive: new THREE.Color(0x7ff0de),
+      emissiveMap: texture,
+      emissiveIntensity: 1.1,
+    });
+    const sides = new THREE.MeshStandardMaterial({ color: 0x07201c });
+
+    const box = new THREE.Box3().setFromObject(this.mesh);
+    const sign = new THREE.Mesh(
+      new THREE.BoxGeometry(1.5, 0.42, 0.32),
+      [sides, sides, sides, sides, faces, faces]
+    );
+    sign.position.set(0, box.max.y + 0.2, 0);
+    sign.castShadow = true;
+    this.root.add(sign);
+  }
+
+  /**
+   * Add two thin door panels that can swing open.
+   *
+   * The Kenney taxi is a single body mesh with no separate door geometry, so
+   * unlocking had nothing to show beyond a colour flash. These panels give the
+   * unlock_doors intent real, visible motion.
+   */
+  private addDoors(): void {
+    const box = new THREE.Box3().setFromObject(this.mesh);
+    const size = new THREE.Vector3();
+    box.getSize(size);
+    const material = new THREE.MeshStandardMaterial({
+      color: PALETTE.hero,
+      roughness: 0.45,
+      metalness: 0.35,
+    });
+
+    for (const side of [-1, 1]) {
+      // A hinge at the front edge of the door, so the panel swings outward.
+      const hinge = new THREE.Group();
+      hinge.position.set(side * (size.x * 0.5), size.y * 0.42, size.z * 0.12);
+
+      const panel = new THREE.Mesh(
+        new THREE.BoxGeometry(0.08, size.y * 0.42, size.z * 0.38),
+        material.clone()
+      );
+      // Offset so the panel hangs off the hinge rather than straddling it.
+      panel.position.set(0, 0, -size.z * 0.19);
+      panel.castShadow = true;
+      hinge.add(panel);
+
+      this.root.add(hinge);
+      this.doorHinges.push(hinge);
+    }
   }
 
   /**
@@ -135,6 +224,7 @@ export class Robotaxi {
   update(dt: number, traffic: THREE.Vector3[] = []): void {
     this.nearby = traffic;
     this.updateDoorFlash(dt);
+    this.updateDoors(dt);
 
     // Always yield to whatever is directly ahead. The taxi never drives
     // through another vehicle; if the wait drags on while free-roaming it
@@ -187,14 +277,10 @@ export class Robotaxi {
    * @returns True if the taxi should wait rather than drive on.
    */
   private shouldYield(traffic: THREE.Vector3[]): boolean {
-    if (traffic.length === 0) return false;
-    const forward = new THREE.Vector3(Math.sin(this.heading), 0, Math.cos(this.heading));
     for (const other of traffic) {
-      const toOther = new THREE.Vector3().subVectors(other, this.position);
-      toOther.y = 0;
-      const distance = toOther.length();
-      if (distance < 0.001 || distance > YIELD_DISTANCE) continue;
-      if (toOther.normalize().dot(forward) > YIELD_CONE) return true;
+      if (blocksAhead(this.position, this.heading, other, YIELD_DISTANCE)) {
+        return true;
+      }
     }
     return false;
   }
@@ -217,13 +303,17 @@ export class Robotaxi {
   /** Drive toward the current target node at cruise speed. */
   private drive(dt: number): void {
     const target = this.graph.node(this.targetNodeId)!;
-    const toTarget = new THREE.Vector3().subVectors(target.pos, this.position);
+    const from = this.graph.node(this.lastNodeId)!;
+    // Keep right, so oncoming traffic passes instead of meeting nose to nose.
+    const edgeHeading = headingTo(from.pos, target.pos);
+    const laneTarget = toLane(target.pos, edgeHeading);
+    const toTarget = new THREE.Vector3().subVectors(laneTarget, this.position);
     const distance = toTarget.length();
     const step = DRIVE.speed * dt;
 
     if (distance <= step || distance < 0.05) {
-      if (this.wouldCollide(target.pos)) return;
-      this.position.copy(target.pos);
+      if (this.wouldCollide(laneTarget)) return;
+      this.position.copy(laneTarget);
       const previous = this.lastNodeId;
       this.lastNodeId = this.targetNodeId;
 
@@ -256,8 +346,8 @@ export class Robotaxi {
     const node = this.graph.node(nodeId);
     const facing = this.graph.node(facingNodeId);
     if (!node || !facing) return;
-    this.position.copy(node.pos);
-    this.heading = Math.atan2(facing.pos.x - node.pos.x, facing.pos.z - node.pos.z);
+    this.heading = headingTo(node.pos, facing.pos);
+    toLane(node.pos, this.heading, this.position);
     this.lastNodeId = nodeId;
     this.targetNodeId = facingNodeId;
     this.goalNodeId = null;
@@ -281,8 +371,6 @@ export class Robotaxi {
       .neighbors(this.lastNodeId)
       .filter((id) => id !== this.targetNodeId);
     if (alternatives.length === 0) return;
-    const node = this.graph.node(this.lastNodeId)!;
-    this.position.copy(node.pos);
     this.targetNodeId = alternatives[Math.floor(this.rng() * alternatives.length)];
     this.mode = "paused";
     this.pauseTimer = DRIVE.nodePauseSeconds;
@@ -368,6 +456,7 @@ export class Robotaxi {
         this.waitTimer = command.parameters.duration_s ?? 3;
         break;
       case "resume":
+        this.doorsOpen = false;
         this.mode = "driving";
         break;
       case "creep_forward":
@@ -434,9 +523,40 @@ export class Robotaxi {
     return this.position;
   }
 
-  /** Begin a door-unlock highlight flash. */
+  /** Unlock and swing the doors open, with a short highlight flash. */
   private flashDoors(): void {
     this.doorFlashTimer = 1.6;
+    this.doorsOpen = true;
+  }
+
+  /** Close the doors again, used once a rider has climbed in. */
+  closeDoors(): void {
+    this.doorsOpen = false;
+  }
+
+  /** Whether the doors are open far enough to climb through. */
+  get doorsAreOpen(): boolean {
+    return this.doorOpenAmount > 0.6;
+  }
+
+  /**
+   * Ease the door panels towards their commanded position.
+   *
+   * @param dt - Delta time in seconds.
+   */
+  private updateDoors(dt: number): void {
+    const target = this.doorsOpen ? 1 : 0;
+    const speed = 2.6;
+    if (this.doorOpenAmount < target) {
+      this.doorOpenAmount = Math.min(target, this.doorOpenAmount + speed * dt);
+    } else if (this.doorOpenAmount > target) {
+      this.doorOpenAmount = Math.max(target, this.doorOpenAmount - speed * dt);
+    }
+    const angle = this.doorOpenAmount * (Math.PI / 2.6);
+    this.doorHinges.forEach((hinge, index) => {
+      // Left and right doors swing in opposite directions.
+      hinge.rotation.y = index === 0 ? angle : -angle;
+    });
   }
 
   /**

@@ -24,6 +24,7 @@ export interface OverlayHandlers {
   onResume: () => void;
   onPickPlace: (placeName: string) => void;
   onScenario: (scenarioId: string | null) => void;
+  onBoard: () => void;
 }
 
 /**
@@ -60,6 +61,7 @@ export class Overlay {
   private readonly backendToggle: HTMLButtonElement;
   private readonly utteranceEl: HTMLElement;
   private readonly jsonEl: HTMLElement;
+  private readonly understoodEl: HTMLElement;
   private readonly gateEl: HTMLElement;
   private readonly actionEl: HTMLElement;
   private readonly speechEl: HTMLElement;
@@ -67,6 +69,7 @@ export class Overlay {
   private readonly viewButtons: HTMLButtonElement[] = [];
   private readonly hintEl: HTMLElement;
   private readonly examplesHost: HTMLElement;
+  private readonly boardPrompt: HTMLButtonElement;
   private readonly situationEl: HTMLElement;
   private readonly becauseEl: HTMLElement;
   private finetunedAvailable = false;
@@ -108,21 +111,36 @@ export class Overlay {
       </div>
       <div class="ov-examples"></div>
       <div class="ov-pipeline">
-        <div class="ov-stage"><span class="ov-label">utterance</span><div class="ov-utterance">—</div></div>
-        <div class="ov-stage"><span class="ov-label">model JSON</span><pre class="ov-json">—</pre></div>
-        <div class="ov-stage"><span class="ov-label">gate</span><div class="ov-gate">—</div></div>
-        <div class="ov-stage"><span class="ov-label">action</span><div class="ov-action">—</div></div>
-        <div class="ov-stage"><span class="ov-label">car says</span><div class="ov-speech">—</div></div>
+        <div class="ov-stage"><span class="ov-label">you said</span><div class="ov-utterance">-</div></div>
+        <div class="ov-stage">
+          <span class="ov-label">the car understood</span>
+          <div class="ov-understood">-</div>
+        </div>
+        <div class="ov-stage"><span class="ov-label">gate</span><div class="ov-gate">-</div></div>
+        <div class="ov-stage"><span class="ov-label">action</span><div class="ov-action">-</div></div>
+        <div class="ov-stage"><span class="ov-label">car says</span><div class="ov-speech">-</div></div>
         <div class="ov-because"></div>
+        <details class="ov-raw">
+          <summary>Raw model output</summary>
+          <pre class="ov-json">-</pre>
+        </details>
       </div>
     `;
     container.appendChild(panel);
+
+    // Floating prompt, shown only when boarding is actually possible.
+    this.boardPrompt = document.createElement("button");
+    this.boardPrompt.className = "ov-board";
+    this.boardPrompt.textContent = "Get in the robotaxi";
+    this.boardPrompt.addEventListener("click", () => this.handlers.onBoard());
+    container.appendChild(this.boardPrompt);
 
     this.input = panel.querySelector(".ov-input")!;
     this.micButton = panel.querySelector(".ov-mic")!;
     this.backendToggle = panel.querySelector(".ov-backend")!;
     this.utteranceEl = panel.querySelector(".ov-utterance")!;
     this.jsonEl = panel.querySelector(".ov-json")!;
+    this.understoodEl = panel.querySelector(".ov-understood")!;
     this.gateEl = panel.querySelector(".ov-gate")!;
     this.actionEl = panel.querySelector(".ov-action")!;
     this.speechEl = panel.querySelector(".ov-speech")!;
@@ -354,6 +372,29 @@ export class Overlay {
   }
 
   /**
+   * Show or hide the boarding prompt.
+   *
+   * @param canBoard - True when the rider is beside the cab with its doors open.
+   */
+  setCanBoard(canBoard: boolean): void {
+    this.boardPrompt.classList.toggle("ov-board-on", canBoard);
+  }
+
+  /**
+   * Build a small rounded tag for the readable command summary.
+   *
+   * @param text - Label to show.
+   * @param className - Modifier class controlling the tint.
+   * @returns The tag element.
+   */
+  private chip(text: string, className: string): HTMLSpanElement {
+    const tag = document.createElement("span");
+    tag.className = `ov-tag ${className}`;
+    tag.textContent = text;
+    return tag;
+  }
+
+  /**
    * Show that a request is in flight for an utterance.
    *
    * @param utterance - The text being parsed.
@@ -361,10 +402,11 @@ export class Overlay {
   showPending(utterance: string): void {
     this.utteranceEl.textContent = utterance;
     this.jsonEl.textContent = "parsing...";
-    this.gateEl.textContent = "…";
+    this.understoodEl.textContent = "thinking...";
+    this.gateEl.textContent = "...";
     this.gateEl.className = "ov-gate";
-    this.actionEl.textContent = "—";
-    this.speechEl.textContent = "—";
+    this.actionEl.textContent = "-";
+    this.speechEl.textContent = "-";
   }
 
   /**
@@ -376,14 +418,27 @@ export class Overlay {
   showResult(response: ParseResponse, actionText: string): void {
     if (!response.ok || !response.command) {
       this.jsonEl.textContent = response.raw ?? JSON.stringify(response, null, 2);
+      this.understoodEl.textContent = "could not parse";
       this.gateEl.textContent = "error";
       this.gateEl.className = "ov-gate ov-gate-reject";
       this.actionEl.textContent = response.error ?? "no action";
-      this.speechEl.textContent = "—";
+      this.speechEl.textContent = "-";
       return;
     }
     const command = response.command;
     this.jsonEl.textContent = JSON.stringify(command, null, 2);
+    this.understoodEl.innerHTML = "";
+    this.understoodEl.appendChild(this.chip(command.intent, "ov-tag-intent"));
+    for (const [key, value] of Object.entries(command.parameters)) {
+      if (value === null || value === undefined) continue;
+      const label = key.replace("_m", "").replace("_s", "").replace("_node", "");
+      const unit = key.endsWith("_m") ? " m" : key.endsWith("_s") ? " s" : "";
+      this.understoodEl.appendChild(this.chip(`${label} ${value}${unit}`, "ov-tag-param"));
+    }
+    this.understoodEl.appendChild(
+      this.chip(`as ${command.actor_role}`, "ov-tag-role")
+    );
+
     this.gateEl.textContent = `${command.safety_gate}${
       command.gate_reason ? `: ${command.gate_reason}` : ""
     }${command.clarification_question ? `: ${command.clarification_question}` : ""}`;

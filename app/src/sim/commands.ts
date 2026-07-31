@@ -36,7 +36,7 @@ export function actionDescription(command: Command): string {
     case "change_destination":
       return "Re-routing to a new destination";
     case "unlock_doors":
-      return "Flashing doors unlocked";
+      return "Unlocking and opening the doors";
     case "none":
       return "No action";
   }
