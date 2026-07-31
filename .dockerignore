@@ -1,0 +1,9 @@
+# Keep the build context small and free of local-only state.
+.venv/
+app/node_modules/
+app/dist/
+data/raw/
+.git/
+__pycache__/
+*.pyc
+.env
