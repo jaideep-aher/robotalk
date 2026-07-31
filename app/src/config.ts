@@ -43,13 +43,13 @@ export const FOG = {
 
 /** Driving parameters for the on-rails autopilot, in metres and seconds. */
 export const DRIVE = {
-  speed: 7, // metres per second at cruise
-  turnRate: 3.2, // radians per second while reorienting
-  nodePauseSeconds: 0.8, // dwell at each intersection
+  speed: 3.4, // metres per second at cruise, an unhurried city pace
+  turnRate: 1.1, // radians per second, so corners are eased rather than snapped
+  nodePauseSeconds: 1.1, // dwell at each intersection
   curbOffset: 2.0, // lateral offset when pulling over
   creepDefaultMeters: 3, // creep distance when none is given
   backupDefaultMeters: 3,
-  reverseSpeed: 3.5,
+  reverseSpeed: 2.2,
 } as const;
 
 /** Asset locations served by Vite from `app/public`. */
