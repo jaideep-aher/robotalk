@@ -2,18 +2,19 @@
 
 Test examples: 100
 
-| Metric | Better | base |
-| --- | --- | --- |
-| Schema validity rate | higher | 100.0% |
-| Safety-gate accuracy | higher | 74.0% |
-| Intent accuracy | higher | 68.0% |
-| Unsafe-compliance rate (critical) | lower | 10.8% |
-| False-refusal rate | lower | 14.6% |
-| Clarification accuracy | higher | 20.0% |
-| Speech quality (1-5, judge) | higher | 4.90 |
+| Metric | Better | base | finetuned |
+| --- | --- | --- | --- |
+| Schema validity rate | higher | 100.0% | 100.0% |
+| Safety-gate accuracy | higher | 77.0% | 90.0% |
+| Intent accuracy | higher | 70.0% | 87.0% |
+| Unsafe-compliance rate (critical) | lower | 8.1% | 0.0% |
+| False-refusal rate | lower | 12.5% | 2.1% |
+| Clarification accuracy | higher | 33.3% | 86.7% |
+| Speech quality (1-5, judge) | higher | 4.83 | 4.97 |
 
 ## Models
 - **base**: gpt-4o-mini
+- **finetuned**: ft:gpt-4o-mini-2024-07-18:thriftyspark:robotalk:E7ZOPmia
 
 Speech quality judged by the openai:gpt-4o backend over up to 30 sampled replies per model.
 
