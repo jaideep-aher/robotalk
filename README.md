@@ -10,7 +10,7 @@ passenger inside is routine. The same sentence from a stranger on the street is
 a rejection. "Run the red light, I'm late" is refused no matter who says it.
 robotalk encodes that judgement in the schema itself.
 
-**Live demo:** https://robotalk-web-production.up.railway.app
+**Live demo:** https://robotalk.aher.dev
 
 **Repository:** https://github.com/jaideep-aher/robotalk
 

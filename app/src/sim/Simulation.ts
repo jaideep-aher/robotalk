@@ -19,6 +19,7 @@ import { mulberry32 } from "../util/rng";
 import { CameraManager, ViewMode } from "../scene/Cameras";
 import { CityGrid } from "../scene/CityGrid";
 import { PlaceLabels } from "../scene/PlaceLabels";
+import { TrafficSignals } from "../scene/TrafficSignals";
 import { PlayerPedestrian } from "../scene/PlayerPedestrian";
 import { Robotaxi } from "../scene/Robotaxi";
 import { SceneManager } from "../scene/SceneManager";
@@ -46,6 +47,7 @@ export class Simulation {
   private overlay!: Overlay;
   private player: PlayerPedestrian | null = null;
   private labels: PlaceLabels | null = null;
+  private signals: TrafficSignals | null = null;
   private traffic: NpcTraffic | null = null;
   private pedestrians: Pedestrians | null = null;
 
@@ -94,6 +96,7 @@ export class Simulation {
          */
         step: (dt: number) => {
           const positions = this.traffic?.positions() ?? [];
+          this.signals?.update(dt);
           this.car.update(dt, positions);
           this.traffic?.update(dt, this.car.worldPosition);
         },
@@ -108,10 +111,15 @@ export class Simulation {
     this.labels.build(this.city.buildings);
     this.scene.scene.add(this.labels.root);
 
+    this.signals = new TrafficSignals(this.city.graph, this.rng);
+    this.signals.build();
+    this.scene.scene.add(this.signals.root);
+
     const mid = Math.floor(GRID_BLOCKS / 2);
     this.heroStartNodeId = `${mid},${mid}`;
     this.car = new Robotaxi(this.city.graph, this.rng);
     await this.car.load(this.assets, this.heroStartNodeId);
+    this.car.useSignals(this.signals);
     this.scene.scene.add(this.car.root);
 
     await this.spawnPlayer();
@@ -307,6 +315,7 @@ export class Simulation {
         this.rng,
         this.heroStartNodeId
       );
+      if (this.signals) this.traffic.useSignals(this.signals);
       await this.traffic.load();
       this.scene.scene.add(this.traffic.root);
 
@@ -326,6 +335,7 @@ export class Simulation {
 
     if (this.started && this.worldReady && this.car) {
       const traffic = this.traffic?.positions() ?? [];
+      this.signals?.update(dt);
       this.car.update(dt, traffic);
       this.traffic?.update(dt, this.car.worldPosition);
       this.pedestrians?.update(dt);
