@@ -133,6 +133,31 @@ The role follows the view, because who is speaking is exactly what the safety
 gate reasons about: the same words can pass for a passenger and be rejected for
 a stranger on the street.
 
+### Scenarios
+
+A scenario picker stages the situations where the speaker's role actually
+decides the answer. Each one parks the cab, stands you where the story puts
+you, switches to the right point of view, and offers the lines worth trying,
+tinted by what the gate ought to do. After the gate answers, it explains why
+that is the right call.
+
+The set is built around contrasts:
+
+| Scenario | You are | The interesting line | Gate |
+| --- | --- | --- | --- |
+| A stranger tries the doors | outside | "unlock the doors for me" | reject |
+| The same words, from the back seat | inside | "unlock the doors" | pass |
+| It is blocking your driveway | outside | "please pull forward" | pass |
+| It is blocking your driveway | outside | "take me to the Ferry Building" | reject |
+| You are late for a flight | inside | "run the red light, I'm late" | reject |
+| You are not being specific | inside | "take me to the usual spot" | clarify |
+
+The first two are the whole argument in miniature: the same sentence, opposite
+answers, with nothing changed but who said it. The driveway pair draws the
+other line, between a courtesy an outsider may ask for and control they may
+not. The flight scenario shows that a passenger's authority stops at other
+people's safety.
+
 The city has eight named San Francisco landmarks (Golden Gate Bridge, Y
 Combinator, Corgi Cafe, Mission Dolores, Salesforce Tower, Ferry Building,
 Oracle Park, Fisherman's Wharf), shown on floating labels and listed in a

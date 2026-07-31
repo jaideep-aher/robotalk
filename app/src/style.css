@@ -265,6 +265,65 @@ body {
   color: var(--text);
 }
 
+/* Scenarios */
+
+.ov-scenarios {
+  width: 100%;
+  background: rgba(0, 0, 0, 0.3);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  color: var(--text);
+  border-radius: 8px;
+  padding: 8px;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.ov-situation {
+  font-size: 12.5px;
+  line-height: 1.45;
+  color: var(--muted);
+}
+
+.ov-situation-on {
+  color: #ffd9a8;
+  background: rgba(255, 178, 107, 0.12);
+  border-left: 3px solid var(--clarify);
+  padding: 7px 9px;
+  border-radius: 0 8px 8px 0;
+}
+
+/* Expected-outcome tint on scenario chips */
+.ov-chip-pass {
+  border-color: rgba(52, 211, 153, 0.55);
+  color: #b7f7de;
+}
+
+.ov-chip-reject {
+  border-color: rgba(251, 113, 133, 0.55);
+  color: #ffc8d1;
+}
+
+.ov-chip-clarify {
+  border-color: rgba(251, 191, 36, 0.55);
+  color: #ffe4a8;
+}
+
+.ov-because {
+  display: none;
+}
+
+.ov-because-on {
+  display: block;
+  margin-top: 8px;
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--muted);
+  border-left: 3px solid var(--teal);
+  padding: 7px 9px;
+  background: rgba(20, 184, 166, 0.08);
+  border-radius: 0 8px 8px 0;
+}
+
 .ov-controls {
   margin-bottom: 12px;
 }
@@ -363,7 +422,7 @@ body {
 
 .ov-json {
   margin: 0;
-  max-height: 148px;
+  max-height: 108px;
   overflow: auto;
   background: rgba(0, 0, 0, 0.35);
   border-radius: 8px;

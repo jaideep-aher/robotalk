@@ -12,6 +12,8 @@ import { checkHealth, parseCommand } from "../api";
 import { AssetLibrary } from "../assets";
 import { GRID_BLOCKS } from "../config";
 import { PLACES, placeNodeId, resolvePlace } from "../places";
+import { findScenario } from "../scenarios";
+import { WaypointGraph } from "../scene/WaypointGraph";
 import type { ActorRole, Backend, Command } from "../types";
 import { mulberry32 } from "../util/rng";
 import { CameraManager, ViewMode } from "../scene/Cameras";
@@ -136,6 +138,7 @@ export class Simulation {
       onHail: () => this.hailRobotaxi(),
       onResume: () => this.resumeCruising(),
       onPickPlace: (name) => void this.handleUtterance(`take me to ${name}`),
+      onScenario: (id) => this.loadScenario(id),
     });
     this.overlay.setMicSupported(this.recognizer.supported);
     this.overlay.setViewMode(this.viewMode);
@@ -158,11 +161,11 @@ export class Simulation {
    *
    * @param mode - The viewpoint to switch to.
    */
-  private setViewMode(mode: ViewMode): void {
+  private setViewMode(mode: ViewMode, keepExamples = false): void {
     this.viewMode = mode;
     this.actorRole = mode === "pedestrian" ? "external" : "passenger";
     this.cameras.setMode(mode);
-    this.overlay.setViewMode(mode);
+    this.overlay.setViewMode(mode, keepExamples);
   }
 
   /** Send the taxi to pick the player up wherever they are standing. */
@@ -172,6 +175,38 @@ export class Simulation {
     this.car.hailTo(rider);
     this.overlay.setStatus("Robotaxi is on its way to you.");
     speak("On my way to pick you up.");
+  }
+
+  /**
+   * Stage a scenario: park the cab, stand the player where the story puts
+   * them, and switch to the point of view the situation is told from.
+   *
+   * @param id - The scenario id, or null to return to free roam.
+   */
+  private loadScenario(id: string | null): void {
+    if (!id) {
+      this.overlay.setScenario(null);
+      this.overlay.setStatus("Free roam. Cruising the city.");
+      this.car?.resumeFreeRoam();
+      return;
+    }
+    const scenario = findScenario(id);
+    if (!scenario || !this.worldReady || !this.car) return;
+
+    const cabNode = WaypointGraph.idOf(...scenario.cabNode);
+    const facingNode = WaypointGraph.idOf(...scenario.cabFacing);
+    this.car.placeAt(cabNode, facingNode);
+
+    const cab = this.city.graph.node(cabNode)!;
+    const [ox, oz] = scenario.playerOffset;
+    this.player?.placeAt(
+      new THREE.Vector3(cab.pos.x + ox, 0, cab.pos.z + oz),
+      cab.pos
+    );
+
+    this.setViewMode(scenario.view, true);
+    this.overlay.setScenario(scenario);
+    this.overlay.setStatus("Scenario loaded. Try the suggested lines.");
   }
 
   /** Send the taxi back out cruising after it has stopped or arrived. */

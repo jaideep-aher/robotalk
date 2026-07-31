@@ -147,6 +147,18 @@ export class PlayerPedestrian {
     this.root.position.z = THREE.MathUtils.clamp(this.root.position.z, -limit, limit);
   }
 
+  /**
+   * Drop the player at a position facing a point, for staging a scenario.
+   *
+   * @param position - Where to stand.
+   * @param lookAt - Point to face.
+   */
+  placeAt(position: THREE.Vector3, lookAt: THREE.Vector3): void {
+    this.root.position.copy(position);
+    this.heading = Math.atan2(lookAt.x - position.x, lookAt.z - position.z);
+    this.root.rotation.y = this.heading;
+  }
+
   /** Eye-level world position, for the camera to ride. */
   get eyePosition(): THREE.Vector3 {
     return new THREE.Vector3(
