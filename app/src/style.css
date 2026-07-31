@@ -211,8 +211,23 @@ body {
   background: rgba(20, 184, 166, 0.3);
 }
 
+.ov-resume {
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  color: var(--text);
+  border-radius: 8px;
+  padding: 8px 12px;
+  font-size: 13px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.ov-resume:hover {
+  border-color: var(--teal);
+}
+
 .ov-places {
-  flex: 1;
+  width: 100%;
   min-width: 0;
   background: rgba(0, 0, 0, 0.3);
   border: 1px solid rgba(255, 255, 255, 0.12);

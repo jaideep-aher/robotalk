@@ -30,11 +30,10 @@ import { CAR_FORWARD_OFFSET } from "./carOrientation";
 const YIELD_DISTANCE = 6.0;
 /** Cosine of the half-angle counted as "ahead" when yielding. */
 const YIELD_CONE = 0.75;
-/**
- * Give up yielding after this long. Two cars can otherwise each wait for the
- * other forever; letting the longer-blocked one edge forward breaks the tie.
- */
-const YIELD_TIMEOUT = 2.5;
+/** After waiting this long behind traffic while free-roaming, turn elsewhere. */
+const REROUTE_AFTER = 2.0;
+/** Hard floor on the gap between vehicle centres, above the 4.6 m car length. */
+const MIN_SEPARATION = 5.2;
 
 /**
  * The hero vehicle. Construct with {@link load}, then drive with {@link update}
@@ -55,6 +54,8 @@ export class Robotaxi {
   private doorFlashTimer = 0;
   private yielding = false;
   private yieldTimer = 0;
+  /** Positions of other vehicles this frame, used for separation checks. */
+  private nearby: THREE.Vector3[] = [];
   /** Set for one read when the taxi reaches its requested destination. */
   arrived = false;
   /** Node the taxi is currently routing to, if a destination was set. */
@@ -132,16 +133,21 @@ export class Robotaxi {
    *   driving through them.
    */
   update(dt: number, traffic: THREE.Vector3[] = []): void {
+    this.nearby = traffic;
     this.updateDoorFlash(dt);
 
-    // Yield to whatever is directly ahead, but never indefinitely: a stuck
-    // pair of cars would otherwise wait on each other forever.
-    if (this.shouldYield(traffic)) {
+    // Always yield to whatever is directly ahead. The taxi never drives
+    // through another vehicle; if the wait drags on while free-roaming it
+    // turns down a different street instead.
+    this.yielding = this.shouldYield(traffic);
+    if (this.yielding) {
       this.yieldTimer += dt;
-      this.yielding = this.yieldTimer < YIELD_TIMEOUT;
+      if (this.yieldTimer > REROUTE_AFTER && !this.goalNodeId) {
+        this.yieldTimer = 0;
+        this.turnAway();
+      }
     } else {
       this.yieldTimer = 0;
-      this.yielding = false;
     }
 
     switch (this.mode) {
@@ -193,6 +199,21 @@ export class Robotaxi {
     return false;
   }
 
+  /**
+   * Whether moving to a position would put the taxi inside another vehicle.
+   *
+   * @param candidate - The position it wants to occupy.
+   * @returns True if the move must be refused.
+   */
+  private wouldCollide(candidate: THREE.Vector3): boolean {
+    for (const other of this.nearby) {
+      if (Math.hypot(candidate.x - other.x, candidate.z - other.z) < MIN_SEPARATION) {
+        return true;
+      }
+    }
+    return false;
+  }
+
   /** Drive toward the current target node at cruise speed. */
   private drive(dt: number): void {
     const target = this.graph.node(this.targetNodeId)!;
@@ -201,6 +222,7 @@ export class Robotaxi {
     const step = DRIVE.speed * dt;
 
     if (distance <= step || distance < 0.05) {
+      if (this.wouldCollide(target.pos)) return;
       this.position.copy(target.pos);
       const previous = this.lastNodeId;
       this.lastNodeId = this.targetNodeId;
@@ -218,8 +240,31 @@ export class Robotaxi {
       return;
     }
     toTarget.normalize();
-    this.position.addScaledVector(toTarget, step);
+    const tentative = this.position.clone().addScaledVector(toTarget, step);
+    if (this.wouldCollide(tentative)) return;
+    this.position.copy(tentative);
     this.steerToward(Math.atan2(toTarget.x, toTarget.z), dt);
+  }
+
+  /** Drop any destination and go back to cruising the grid. */
+  resumeFreeRoam(): void {
+    this.goalNodeId = null;
+    this.destinationName = null;
+    this.arrived = false;
+    this.mode = "driving";
+  }
+
+  /** Head back the way it came, to escape traffic while free-roaming. */
+  private turnAway(): void {
+    const alternatives = this.graph
+      .neighbors(this.lastNodeId)
+      .filter((id) => id !== this.targetNodeId);
+    if (alternatives.length === 0) return;
+    const node = this.graph.node(this.lastNodeId)!;
+    this.position.copy(node.pos);
+    this.targetNodeId = alternatives[Math.floor(this.rng() * alternatives.length)];
+    this.mode = "paused";
+    this.pauseTimer = DRIVE.nodePauseSeconds;
   }
 
   /**
@@ -246,7 +291,10 @@ export class Robotaxi {
    */
   private advance(signedStep: number): number {
     const forward = new THREE.Vector3(Math.sin(this.heading), 0, Math.cos(this.heading));
-    this.position.addScaledVector(forward, signedStep);
+    const tentative = this.position.clone().addScaledVector(forward, signedStep);
+    // Even an explicitly commanded creep or reverse stops short of traffic.
+    if (this.wouldCollide(tentative)) return 0;
+    this.position.copy(tentative);
     return Math.abs(signedStep);
   }
 

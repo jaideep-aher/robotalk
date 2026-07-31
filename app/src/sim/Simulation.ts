@@ -42,6 +42,7 @@ export class Simulation {
   private car!: Robotaxi;
   private overlay!: Overlay;
   private player: PlayerPedestrian | null = null;
+  private labels: PlaceLabels | null = null;
   private traffic: NpcTraffic | null = null;
   private pedestrians: Pedestrians | null = null;
 
@@ -79,6 +80,16 @@ export class Simulation {
         scene: this.scene,
         cameras: this.cameras,
         getCar: () => this.car,
+        getTraffic: () => this.traffic,
+        /**
+         * Step the vehicle systems without rendering, so traffic behaviour can
+         * be stress-tested far faster than real time.
+         */
+        step: (dt: number) => {
+          const positions = this.traffic?.positions() ?? [];
+          this.car.update(dt, positions);
+          this.traffic?.update(dt, this.car.worldPosition);
+        },
       };
     }
     this.loop();
@@ -86,9 +97,9 @@ export class Simulation {
     await this.city.build();
     this.scene.scene.add(this.city.root);
 
-    const labels = new PlaceLabels(this.city.graph);
-    labels.build();
-    this.scene.scene.add(labels.root);
+    this.labels = new PlaceLabels(this.city.graph);
+    this.labels.build();
+    this.scene.scene.add(this.labels.root);
 
     const mid = Math.floor(GRID_BLOCKS / 2);
     this.heroStartNodeId = `${mid},${mid}`;
@@ -123,6 +134,7 @@ export class Simulation {
       },
       onViewChange: (mode) => this.setViewMode(mode),
       onHail: () => this.hailRobotaxi(),
+      onResume: () => this.resumeCruising(),
       onPickPlace: (name) => void this.handleUtterance(`take me to ${name}`),
     });
     this.overlay.setMicSupported(this.recognizer.supported);
@@ -160,6 +172,13 @@ export class Simulation {
     this.car.hailTo(rider);
     this.overlay.setStatus("Robotaxi is on its way to you.");
     speak("On my way to pick you up.");
+  }
+
+  /** Send the taxi back out cruising after it has stopped or arrived. */
+  private resumeCruising(): void {
+    if (!this.worldReady || !this.car) return;
+    this.car.resumeFreeRoam();
+    this.overlay.setStatus("Cruising the city.");
   }
 
   /** Begin a one-shot dictation, feeding the transcript through the pipeline. */
@@ -265,6 +284,7 @@ export class Simulation {
       }
 
       this.cameras.update(this.car);
+      this.labels?.update(this.cameras.camera.position);
     }
     this.scene.render(this.cameras.camera);
   };

@@ -108,18 +108,28 @@ export class CameraManager {
     this.camera.lookAt(this.tmpLook);
   }
 
-  /** Walk the streets as the player-controlled pedestrian. */
+  /**
+   * Walk the streets as the player-controlled pedestrian.
+   *
+   * The camera sits slightly behind and above the character's head looking
+   * along its facing, which keeps the walker visible for orientation without
+   * putting the near plane inside its own mesh.
+   */
   private updatePedestrian(): void {
-    this.camera.position.copy(this.pedestrianAnchor);
     this.tmpForward.set(
       Math.sin(this.pedestrianHeading),
       0,
       Math.cos(this.pedestrianHeading)
     );
+    this.camera.position.set(
+      this.pedestrianAnchor.x - this.tmpForward.x * 5.0,
+      this.pedestrianAnchor.y + 1.9,
+      this.pedestrianAnchor.z - this.tmpForward.z * 5.0
+    );
     this.tmpLook.set(
-      this.pedestrianAnchor.x + this.tmpForward.x * 20,
-      this.pedestrianAnchor.y - 1.2,
-      this.pedestrianAnchor.z + this.tmpForward.z * 20
+      this.pedestrianAnchor.x + this.tmpForward.x * 18,
+      this.pedestrianAnchor.y - 0.2,
+      this.pedestrianAnchor.z + this.tmpForward.z * 18
     );
     this.camera.lookAt(this.tmpLook);
   }
