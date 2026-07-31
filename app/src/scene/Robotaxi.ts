@@ -20,8 +20,21 @@ type Mode =
   | "backing"
   | "pulled_over";
 
-/** Yaw offset aligning the car model's forward face to +Z heading. */
-const CAR_FORWARD_OFFSET = Math.PI;
+import { CAR_FORWARD_OFFSET } from "./carOrientation";
+
+/**
+ * Stop this far short of a vehicle sitting directly ahead. Kept well under the
+ * 8 m tile spacing so a car parked at the next intersection does not freeze
+ * this one, and comfortably above the 4.6 m car length so they never overlap.
+ */
+const YIELD_DISTANCE = 6.0;
+/** Cosine of the half-angle counted as "ahead" when yielding. */
+const YIELD_CONE = 0.75;
+/**
+ * Give up yielding after this long. Two cars can otherwise each wait for the
+ * other forever; letting the longer-blocked one edge forward breaks the tie.
+ */
+const YIELD_TIMEOUT = 2.5;
 
 /**
  * The hero vehicle. Construct with {@link load}, then drive with {@link update}
@@ -40,6 +53,14 @@ export class Robotaxi {
   private creepRemaining = 0;
   private backRemaining = 0;
   private doorFlashTimer = 0;
+  private yielding = false;
+  private yieldTimer = 0;
+  /** Set for one read when the taxi reaches its requested destination. */
+  arrived = false;
+  /** Node the taxi is currently routing to, if a destination was set. */
+  private goalNodeId: string | null = null;
+  /** Human-readable name of the current destination, for the UI. */
+  destinationName: string | null = null;
 
   private bodyMaterials: THREE.MeshStandardMaterial[] = [];
   private mesh!: THREE.Group;
@@ -107,13 +128,25 @@ export class Robotaxi {
    * Advance the simulation by one frame.
    *
    * @param dt - Delta time in seconds.
+   * @param traffic - Positions of other vehicles, so the taxi holds instead of
+   *   driving through them.
    */
-  update(dt: number): void {
+  update(dt: number, traffic: THREE.Vector3[] = []): void {
     this.updateDoorFlash(dt);
+
+    // Yield to whatever is directly ahead, but never indefinitely: a stuck
+    // pair of cars would otherwise wait on each other forever.
+    if (this.shouldYield(traffic)) {
+      this.yieldTimer += dt;
+      this.yielding = this.yieldTimer < YIELD_TIMEOUT;
+    } else {
+      this.yieldTimer = 0;
+      this.yielding = false;
+    }
 
     switch (this.mode) {
       case "driving":
-        this.drive(dt);
+        if (!this.yielding) this.drive(dt);
         break;
       case "paused":
         this.pauseTimer -= dt;
@@ -125,8 +158,10 @@ export class Robotaxi {
         if (this.waitTimer <= 0) this.mode = "driving";
         break;
       case "creeping":
-        this.creepRemaining -= this.advance(DRIVE.speed * 0.6 * dt);
-        if (this.creepRemaining <= 0) this.mode = "stopped";
+        if (!this.yielding) {
+          this.creepRemaining -= this.advance(DRIVE.speed * 0.6 * dt);
+          if (this.creepRemaining <= 0) this.mode = "stopped";
+        }
         break;
       case "backing":
         this.backRemaining -= this.advance(-DRIVE.reverseSpeed * dt);
@@ -137,6 +172,25 @@ export class Robotaxi {
         break;
     }
     this.syncTransform();
+  }
+
+  /**
+   * Whether a vehicle sits close ahead, so the taxi should hold position.
+   *
+   * @param traffic - World positions of other vehicles.
+   * @returns True if the taxi should wait rather than drive on.
+   */
+  private shouldYield(traffic: THREE.Vector3[]): boolean {
+    if (traffic.length === 0) return false;
+    const forward = new THREE.Vector3(Math.sin(this.heading), 0, Math.cos(this.heading));
+    for (const other of traffic) {
+      const toOther = new THREE.Vector3().subVectors(other, this.position);
+      toOther.y = 0;
+      const distance = toOther.length();
+      if (distance < 0.001 || distance > YIELD_DISTANCE) continue;
+      if (toOther.normalize().dot(forward) > YIELD_CONE) return true;
+    }
+    return false;
   }
 
   /** Drive toward the current target node at cruise speed. */
@@ -150,7 +204,15 @@ export class Robotaxi {
       this.position.copy(target.pos);
       const previous = this.lastNodeId;
       this.lastNodeId = this.targetNodeId;
-      this.targetNodeId = this.pickNextNode(this.targetNodeId, previous);
+
+      // Arrived at the requested destination: park and announce it.
+      if (this.goalNodeId && this.lastNodeId === this.goalNodeId) {
+        this.goalNodeId = null;
+        this.arrived = true;
+        this.mode = "stopped";
+        return;
+      }
+      this.targetNodeId = this.nextTowardGoal(this.targetNodeId, previous);
       this.mode = "paused";
       this.pauseTimer = DRIVE.nodePauseSeconds;
       return;
@@ -158,6 +220,22 @@ export class Robotaxi {
     toTarget.normalize();
     this.position.addScaledVector(toTarget, step);
     this.steerToward(Math.atan2(toTarget.x, toTarget.z), dt);
+  }
+
+  /**
+   * Next node to head for: the routed step toward the goal when one is set,
+   * otherwise a free-roam choice.
+   *
+   * @param fromId - Node just reached.
+   * @param cameFromId - Node departed from.
+   * @returns The next node id.
+   */
+  private nextTowardGoal(fromId: string, cameFromId: string): string {
+    if (this.goalNodeId) {
+      const path = this.graph.route(fromId, this.goalNodeId);
+      if (path.length >= 2) return path[1];
+    }
+    return this.pickNextNode(fromId, cameFromId);
   }
 
   /**
@@ -235,7 +313,8 @@ export class Robotaxi {
         this.pullOver();
         break;
       case "change_destination":
-        this.changeDestination(command.parameters.destination_node);
+        // Destination resolution happens in the simulation, which knows the
+        // place names; it calls routeTo directly.
         break;
       case "unlock_doors":
         this.flashDoors();
@@ -253,22 +332,37 @@ export class Robotaxi {
   }
 
   /**
-   * Re-route to a new destination node and resume driving.
+   * Route to a named destination and start driving there.
    *
-   * @param destinationNode - A node id like "gx,gy" if resolvable, else a new
-   *   random node is chosen to demonstrate re-routing.
+   * @param nodeId - The goal node id.
+   * @param name - Display name of the destination, for the UI and speech.
    */
-  private changeDestination(destinationNode: string | null): void {
-    let goal = destinationNode && this.graph.node(destinationNode)
-      ? destinationNode
-      : this.graph.randomNode(this.rng, this.lastNodeId);
-    const path = this.graph.route(this.lastNodeId, goal);
-    if (path.length >= 2) {
-      this.targetNodeId = path[1];
-    } else {
-      this.targetNodeId = this.pickNextNode(this.lastNodeId, this.lastNodeId);
-    }
+  routeTo(nodeId: string, name: string): void {
+    if (!this.graph.node(nodeId)) return;
+    this.goalNodeId = nodeId;
+    this.destinationName = name;
+    this.arrived = false;
+    const path = this.graph.route(this.lastNodeId, nodeId);
+    this.targetNodeId =
+      path.length >= 2 ? path[1] : this.pickNextNode(this.lastNodeId, this.lastNodeId);
     this.mode = "driving";
+  }
+
+  /**
+   * Drive to the intersection nearest a waiting rider and stop there.
+   *
+   * @param riderPosition - Where the rider is standing.
+   * @returns The node id the taxi is heading to.
+   */
+  hailTo(riderPosition: THREE.Vector3): string {
+    const pickup = this.graph.nearestNode(riderPosition);
+    this.routeTo(pickup.id, "your pickup point");
+    return pickup.id;
+  }
+
+  /** Current world position, for other systems to avoid driving through. */
+  get worldPosition(): THREE.Vector3 {
+    return this.position;
   }
 
   /** Begin a door-unlock highlight flash. */

@@ -10,11 +10,19 @@ import { AssetLibrary } from "../assets";
 import { ASSETS, NPC_CAR_MODELS, WORLD } from "../config";
 import type { WaypointGraph } from "./WaypointGraph";
 
-/** Yaw offset aligning the car model's forward face to +Z heading. */
-const CAR_FORWARD_OFFSET = Math.PI;
+import { CAR_FORWARD_OFFSET } from "./carOrientation";
+
 const NPC_SPEED = 5.0; // metres per second
-const FOLLOW_DISTANCE = 7.5; // stop if a car is this close ahead
+/**
+ * Stop if a vehicle is this close ahead. Kept below the 8 m tile spacing so a
+ * car waiting at the next intersection does not freeze this one, and above the
+ * 4.6 m car length so they never visually overlap.
+ */
+const FOLLOW_DISTANCE = 6.0;
+const FORWARD_CONE = 0.75; // cos of the half-angle counted as "ahead"
 const NODE_PAUSE = 0.6; // seconds paused at each intersection
+/** Give up waiting after this long, so two cars cannot deadlock each other. */
+const BLOCK_TIMEOUT = 2.5;
 
 /** One NPC vehicle driving the graph. */
 interface NpcCar {
@@ -26,6 +34,8 @@ interface NpcCar {
   pauseTimer: number;
   /** Distance travelled from lastNode along the current edge. */
   progress: number;
+  /** Seconds spent waiting for a vehicle ahead, used to break deadlocks. */
+  blockedFor: number;
 }
 
 /**
@@ -43,7 +53,8 @@ export class NpcTraffic {
   constructor(
     private readonly graph: WaypointGraph,
     private readonly assets: AssetLibrary,
-    private readonly rng: () => number
+    private readonly rng: () => number,
+    private readonly heroStartNodeId = ""
   ) {}
 
   /**
@@ -53,13 +64,20 @@ export class NpcTraffic {
    */
   async load(count = 5): Promise<void> {
     const n = Math.max(4, Math.min(6, count));
+    // Spawn on distinct nodes so no two cars start inside one another.
     const nodeIds = [...this.graph.nodes.keys()];
-    for (let i = 0; i < n; i++) {
+    for (let i = nodeIds.length - 1; i > 0; i--) {
+      const j = Math.floor(this.rng() * (i + 1));
+      [nodeIds[i], nodeIds[j]] = [nodeIds[j], nodeIds[i]];
+    }
+    const spawnIds = nodeIds.filter((id) => id !== this.heroStartNodeId).slice(0, n);
+
+    for (let i = 0; i < spawnIds.length; i++) {
       const model = NPC_CAR_MODELS[i % NPC_CAR_MODELS.length];
       const mesh = await this.assets.instance(`${ASSETS.cars}/${model}.glb`);
       this.scaleCar(mesh);
 
-      const startId = nodeIds[Math.floor(this.rng() * nodeIds.length)];
+      const startId = spawnIds[i];
       const neighbors = this.graph.neighbors(startId);
       const targetId = neighbors[Math.floor(this.rng() * neighbors.length)];
       const start = this.graph.node(startId)!;
@@ -74,11 +92,21 @@ export class NpcTraffic {
         targetNodeId: targetId,
         pauseTimer: this.rng() * NODE_PAUSE,
         progress: 0,
+        blockedFor: 0,
       };
       this.settle(car);
       this.root.add(group);
       this.cars.push(car);
     }
+  }
+
+  /**
+   * World positions of every NPC car, so other drivers can avoid them.
+   *
+   * @returns A list of live position vectors.
+   */
+  positions(): THREE.Vector3[] {
+    return this.cars.map((car) => car.position);
   }
 
   /**
@@ -98,17 +126,24 @@ export class NpcTraffic {
    * Advance all NPC cars, applying the follow-distance queueing rule.
    *
    * @param dt - Delta time in seconds.
+   * @param heroPosition - Where the player's robotaxi is, so NPCs yield to it
+   *   instead of driving through it.
    */
-  update(dt: number): void {
+  update(dt: number, heroPosition?: THREE.Vector3): void {
     for (const car of this.cars) {
       if (car.pauseTimer > 0) {
         car.pauseTimer -= dt;
         this.applyTransform(car);
         continue;
       }
-      if (this.blockedAhead(car)) {
-        this.applyTransform(car);
-        continue;
+      if (this.blockedAhead(car, heroPosition)) {
+        car.blockedFor += dt;
+        if (car.blockedFor < BLOCK_TIMEOUT) {
+          this.applyTransform(car);
+          continue;
+        }
+      } else {
+        car.blockedFor = 0;
       }
       this.advance(car, dt);
       this.applyTransform(car);
@@ -116,20 +151,31 @@ export class NpcTraffic {
   }
 
   /**
-   * Whether another car is close ahead on the same directed edge.
+   * Whether any vehicle sits close ahead of this one.
+   *
+   * Checked as a forward-cone proximity test in world space rather than a
+   * same-edge test, so cars also yield when converging on an intersection from
+   * different edges and never drive through one another or through the hero.
    *
    * @param car - The car to test.
-   * @returns True if the car should hold for the one in front.
+   * @param heroPosition - The hero robotaxi's position, if known.
+   * @returns True if the car should hold.
    */
-  private blockedAhead(car: NpcCar): boolean {
-    for (const other of this.cars) {
-      if (other === car) continue;
-      const sameEdge =
-        other.lastNodeId === car.lastNodeId &&
-        other.targetNodeId === car.targetNodeId;
-      if (!sameEdge) continue;
-      const gap = other.progress - car.progress;
-      if (gap > 0 && gap < FOLLOW_DISTANCE) {
+  private blockedAhead(car: NpcCar, heroPosition?: THREE.Vector3): boolean {
+    const forward = new THREE.Vector3(Math.sin(car.heading), 0, Math.cos(car.heading));
+    const others = this.cars
+      .filter((o) => o !== car)
+      .map((o) => o.position)
+      .concat(heroPosition ? [heroPosition] : []);
+
+    for (const other of others) {
+      const toOther = new THREE.Vector3().subVectors(other, car.position);
+      toOther.y = 0;
+      const distance = toOther.length();
+      if (distance < 0.001 || distance > FOLLOW_DISTANCE) continue;
+      // Only yield to what is genuinely in front, so cars are not deadlocked
+      // by a vehicle sitting beside or behind them.
+      if (toOther.normalize().dot(forward) > FORWARD_CONE) {
         return true;
       }
     }

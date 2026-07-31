@@ -1,17 +1,23 @@
 /**
  * Top-level simulation: builds the scene, drives the robotaxi, wires the UI to
- * the backend, and runs the render loop. Tier 1 lives here end to end; Tier 2
- * ambient life is attached through optional hooks kept isolated below.
+ * the backend, and runs the render loop.
+ *
+ * The UI and render loop come up first so the player never faces a blank
+ * screen; the city, the hero taxi, and the ambient life stream in behind a
+ * readiness flag.
  */
 
 import * as THREE from "three";
 import { checkHealth, parseCommand } from "../api";
 import { AssetLibrary } from "../assets";
 import { GRID_BLOCKS } from "../config";
-import type { ActorRole, Backend } from "../types";
+import { PLACES, placeNodeId, resolvePlace } from "../places";
+import type { ActorRole, Backend, Command } from "../types";
 import { mulberry32 } from "../util/rng";
 import { CameraManager, ViewMode } from "../scene/Cameras";
 import { CityGrid } from "../scene/CityGrid";
+import { PlaceLabels } from "../scene/PlaceLabels";
+import { PlayerPedestrian } from "../scene/PlayerPedestrian";
 import { Robotaxi } from "../scene/Robotaxi";
 import { SceneManager } from "../scene/SceneManager";
 import { NpcTraffic } from "../scene/NpcTraffic";
@@ -35,6 +41,7 @@ export class Simulation {
 
   private car!: Robotaxi;
   private overlay!: Overlay;
+  private player: PlayerPedestrian | null = null;
   private traffic: NpcTraffic | null = null;
   private pedestrians: Pedestrians | null = null;
 
@@ -43,6 +50,8 @@ export class Simulation {
   private backend: Backend = "base";
   private started = false;
   private worldReady = false;
+  private destinationCounter = 0;
+  private heroStartNodeId = "";
 
   /**
    * @param container - The root element to mount the canvas and UI into.
@@ -61,13 +70,10 @@ export class Simulation {
    * background so the user never faces a blank screen while assets download.
    */
   async init(): Promise<void> {
-    // Interactive UI first: the character-select screen and the render loop
-    // (which draws the dusk sky) appear before any model has to load.
     this.buildOverlay();
     void checkHealth().then((h) => this.overlay.setFinetunedAvailable(h.finetunedAvailable));
     new CharacterSelect(this.container, (mode) => this.onCharacterChosen(mode));
 
-    // Development-only handle for inspecting the scene from the console.
     if (import.meta.env.DEV) {
       (window as unknown as { __rt: unknown }).__rt = {
         scene: this.scene,
@@ -77,30 +83,34 @@ export class Simulation {
     }
     this.loop();
 
-    // Build the world in the background; the loop guards on worldReady.
     await this.city.build();
     this.scene.scene.add(this.city.root);
 
+    const labels = new PlaceLabels(this.city.graph);
+    labels.build();
+    this.scene.scene.add(labels.root);
+
     const mid = Math.floor(GRID_BLOCKS / 2);
-    const startNode = `${mid},${mid}`;
+    this.heroStartNodeId = `${mid},${mid}`;
     this.car = new Robotaxi(this.city.graph, this.rng);
-    await this.car.load(this.assets, startNode);
+    await this.car.load(this.assets, this.heroStartNodeId);
     this.scene.scene.add(this.car.root);
 
-    this.positionPedestrianCorner();
+    await this.spawnPlayer();
     this.worldReady = true;
 
-    // Tier 2 ambient life loads once Tier 1 is interactive.
     void this.loadAmbientLife();
   }
 
-  /** Anchor the pedestrian camera at a corner of a central intersection. */
-  private positionPedestrianCorner(): void {
+  /** Create the player-controlled pedestrian near a central corner. */
+  private async spawnPlayer(): Promise<void> {
     const corner = this.city.graph.node("1,1")!;
-    const offset = this.city.tileSize * 0.42;
-    this.cameras.setPedestrianAnchor(
-      new THREE.Vector3(corner.pos.x + offset, 1.6, corner.pos.z + offset)
+    const offset = this.city.tileSize * 0.4;
+    this.player = new PlayerPedestrian();
+    await this.player.load(
+      new THREE.Vector3(corner.pos.x + offset, 0, corner.pos.z + offset)
     );
+    this.scene.scene.add(this.player.root);
   }
 
   /** Construct the overlay and connect its handlers. */
@@ -111,8 +121,12 @@ export class Simulation {
       onBackendChange: (backend) => {
         this.backend = backend;
       },
+      onViewChange: (mode) => this.setViewMode(mode),
+      onHail: () => this.hailRobotaxi(),
+      onPickPlace: (name) => void this.handleUtterance(`take me to ${name}`),
     });
     this.overlay.setMicSupported(this.recognizer.supported);
+    this.overlay.setViewMode(this.viewMode);
   }
 
   /**
@@ -121,13 +135,31 @@ export class Simulation {
    * @param mode - The chosen viewpoint.
    */
   private onCharacterChosen(mode: ViewMode): void {
-    this.viewMode = mode;
-    this.actorRole = mode === "passenger" ? "passenger" : "external";
-    this.cameras.setMode(mode);
+    this.setViewMode(mode);
     this.started = true;
-    if (mode === "pedestrian" && this.pedestrians) {
-      this.attachPedestrianCamera();
-    }
+  }
+
+  /**
+   * Switch the point of view at any time. The actor role follows the view,
+   * since who you are is what the safety gate reasons about: riding inside
+   * makes you the passenger, standing on the street makes you an outsider.
+   *
+   * @param mode - The viewpoint to switch to.
+   */
+  private setViewMode(mode: ViewMode): void {
+    this.viewMode = mode;
+    this.actorRole = mode === "pedestrian" ? "external" : "passenger";
+    this.cameras.setMode(mode);
+    this.overlay.setViewMode(mode);
+  }
+
+  /** Send the taxi to pick the player up wherever they are standing. */
+  private hailRobotaxi(): void {
+    if (!this.worldReady || !this.car) return;
+    const rider = this.player?.root.position ?? new THREE.Vector3();
+    this.car.hailTo(rider);
+    this.overlay.setStatus("Robotaxi is on its way to you.");
+    speak("On my way to pick you up.");
   }
 
   /** Begin a one-shot dictation, feeding the transcript through the pipeline. */
@@ -148,40 +180,64 @@ export class Simulation {
   private async handleUtterance(utterance: string): Promise<void> {
     this.overlay.showPending(utterance);
     const response = await parseCommand(utterance, this.actorRole, this.backend);
-    if (response.ok && response.command) {
-      this.overlay.showResult(response, actionDescription(response.command));
-      this.car?.applyCommand(response.command);
-      speak(response.command.response_speech);
-    } else {
+    if (!response.ok || !response.command) {
       this.overlay.showResult(response, response.error ?? "no action");
+      return;
     }
+
+    const command = response.command;
+    let action = actionDescription(command);
+
+    if (command.safety_gate === "pass") {
+      action = this.applyPassedCommand(command, utterance) ?? action;
+    }
+
+    this.overlay.showResult(response, action);
+    speak(command.response_speech);
+  }
+
+  /**
+   * Apply a command the gate let through, resolving named destinations.
+   *
+   * @param command - The validated command.
+   * @param utterance - The original text, used to name a destination.
+   * @returns An overriding action description, or null to keep the default.
+   */
+  private applyPassedCommand(command: Command, utterance: string): string | null {
+    if (command.intent === "change_destination") {
+      const { place } = resolvePlace(
+        command.parameters.destination_node ?? utterance,
+        this.destinationCounter++
+      );
+      this.car?.routeTo(placeNodeId(place), place.name);
+      this.overlay.setStatus(`Heading to ${place.name}.`);
+      return `Routing to ${place.name}`;
+    }
+    this.car?.applyCommand(command);
+    if (command.intent === "stop" || command.intent === "pull_over") {
+      this.overlay.setStatus("Stopped.");
+    }
+    return null;
   }
 
   /** Load Tier 2 NPC cars and pedestrians without blocking Tier 1. */
   private async loadAmbientLife(): Promise<void> {
     try {
-      this.traffic = new NpcTraffic(this.city.graph, this.assets, this.rng);
+      this.traffic = new NpcTraffic(
+        this.city.graph,
+        this.assets,
+        this.rng,
+        this.heroStartNodeId
+      );
       await this.traffic.load();
       this.scene.scene.add(this.traffic.root);
 
       this.pedestrians = new Pedestrians(this.city.graph, this.assets, this.rng);
       await this.pedestrians.load();
       this.scene.scene.add(this.pedestrians.root);
-
-      if (this.viewMode === "pedestrian") {
-        this.attachPedestrianCamera();
-      }
     } catch (err) {
       // Ambient life is decorative; Tier 1 must not fail if it cannot load.
       console.warn("Ambient life failed to load:", err);
-    }
-  }
-
-  /** Attach the pedestrian camera to a walking NPC at a corner, if available. */
-  private attachPedestrianCamera(): void {
-    const anchor = this.pedestrians?.cornerObserver();
-    if (anchor) {
-      this.cameras.setPedestrianAnchor(anchor);
     }
   }
 
@@ -189,15 +245,30 @@ export class Simulation {
   private loop = (): void => {
     requestAnimationFrame(this.loop);
     const dt = Math.min(this.clock.getDelta(), 0.05);
+
     if (this.started && this.worldReady && this.car) {
-      this.car.update(dt);
-      this.traffic?.update(dt);
+      const traffic = this.traffic?.positions() ?? [];
+      this.car.update(dt, traffic);
+      this.traffic?.update(dt, this.car.worldPosition);
       this.pedestrians?.update(dt);
-      if (this.viewMode === "pedestrian") {
-        this.attachPedestrianCamera();
+
+      this.player?.update(dt);
+      if (this.viewMode === "pedestrian" && this.player) {
+        this.cameras.setPedestrianAnchor(this.player.eyePosition, this.player.heading);
       }
+
+      if (this.car.arrived) {
+        this.car.arrived = false;
+        const name = this.car.destinationName ?? "your destination";
+        this.overlay.setStatus(`Arrived at ${name}.`);
+        speak(`We have arrived at ${name}.`);
+      }
+
       this.cameras.update(this.car);
     }
     this.scene.render(this.cameras.camera);
   };
 }
+
+/** Names of the landmarks, re-exported for convenience in the UI. */
+export const PLACE_NAMES = PLACES.map((p) => p.name);

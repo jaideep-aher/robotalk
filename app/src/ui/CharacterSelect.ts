@@ -27,7 +27,10 @@ export class CharacterSelect {
     this.element.innerHTML = `
       <div class="cs-inner">
         <h1 class="cs-title">robotalk</h1>
-        <p class="cs-sub">Choose who is speaking to the robotaxi.</p>
+        <p class="cs-sub">
+          A self-driving cab that obeys what you say, and refuses what it should.
+          Choose who is speaking to it: authority changes the answer.
+        </p>
         <div class="cs-cards">
           <button class="cs-card" data-mode="passenger">
             <span class="cs-emoji">🧑‍💼</span>
@@ -38,7 +41,7 @@ export class CharacterSelect {
           <button class="cs-card" data-mode="pedestrian">
             <span class="cs-emoji">🚶</span>
             <span class="cs-card-title">Pedestrian</span>
-            <span class="cs-card-desc">Watch from a street corner. You are an external actor. The gate is stricter.</span>
+            <span class="cs-card-desc">Walk the streets yourself with W A S D and hail the cab. You are an external actor, so the gate is stricter.</span>
             <span class="cs-role">actor_role = external</span>
           </button>
         </div>
