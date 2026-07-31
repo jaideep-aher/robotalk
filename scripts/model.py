@@ -56,21 +56,30 @@ class PredictionResult:
 
 
 def read_finetuned_model_id(path: Path = MODEL_ID_FILE) -> str:
-    """Read the fine-tuned model id saved by the fine-tune job.
+    """Resolve the fine-tuned model id.
+
+    Prefers ``FINETUNED_MODEL_ID`` from the environment, which is how hosted
+    deployments are configured, and otherwise falls back to the file the
+    fine-tune job writes locally. The id is specific to the OpenAI account that
+    trained it, so it is configuration rather than source and is not committed.
 
     Args:
-        path: Location of the model id file.
+        path: Location of the model id file used as the local fallback.
 
     Returns:
-        The stored model id string.
+        The fine-tuned model id string.
 
     Raises:
-        FileNotFoundError: If the file is missing (job not finished/recorded).
+        FileNotFoundError: If neither the variable nor the file is present.
     """
 
+    from_env = os.environ.get("FINETUNED_MODEL_ID")
+    if from_env:
+        return from_env.strip()
     if not path.exists():
         raise FileNotFoundError(
-            f"No fine-tuned model id at {path}. Run the fine-tune job first."
+            f"No fine-tuned model id. Set FINETUNED_MODEL_ID or run the "
+            f"fine-tune job to create {path}."
         )
     return path.read_text(encoding="utf-8").strip()
 
