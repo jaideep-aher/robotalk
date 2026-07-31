@@ -1029,3 +1029,47 @@ body {
   .lp-band { padding: 54px 0; }
   .lp-band-tint { padding: 54px var(--pad); }
 }
+
+/* Byline and portfolio link in the masthead */
+
+.lp-byline {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.lp-byline-text {
+  font-size: 13px;
+  color: var(--ink-soft);
+}
+
+.lp-portfolio {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--ink);
+  text-decoration: none;
+  padding: 7px 14px;
+  border: 1px solid var(--line);
+  border-radius: 3px;
+  transition: border-color 0.15s ease, background 0.15s ease;
+}
+
+.lp-portfolio:hover {
+  border-color: var(--ink);
+  background: var(--surface-tint);
+}
+
+.lp-portfolio:focus-visible {
+  outline: 4px solid var(--mint);
+  outline-offset: 2px;
+}
+
+.cs-masthead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+@media (max-width: 680px) {
+  .lp-byline-text { display: none; }
+}
