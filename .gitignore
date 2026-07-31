@@ -17,6 +17,12 @@ __pycache__/
 venv/
 .env/
 
+# Web app: dependencies, build output, and downloaded CC0 assets
+app/node_modules/
+app/dist/
+app/.vite/
+app/public/models/
+
 # OS and editor cruft
 .DS_Store
 .ipynb_checkpoints/

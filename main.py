@@ -5,9 +5,12 @@ the whole project runs through one file:
 
     python main.py make-dataset       # generate the corpus with OpenAI
     python main.py validate           # validate and summarise the splits
+    python main.py serve              # run the FastAPI /parse backend
 
-Each subcommand delegates to a function in :mod:`scripts`. No work happens at
-import time; everything runs under ``main()`` guarded by ``__main__``.
+The FastAPI application object is also exported at module scope as ``app`` so
+the backend can be served directly with ``uvicorn main:app``. Building the app
+only wires routes; the model is constructed lazily on the first request, so
+importing this module stays cheap for the CLI subcommands.
 """
 
 from __future__ import annotations
@@ -15,7 +18,10 @@ from __future__ import annotations
 import argparse
 from typing import List, Optional
 
-from scripts import evaluate, finetune, make_dataset, validate_dataset
+from scripts import evaluate, finetune, make_dataset, server, validate_dataset
+
+# ASGI entry point: ``uvicorn main:app``.
+app = server.create_app()
 
 
 def _add_make_dataset_parser(subparsers: argparse._SubParsersAction) -> None:
@@ -94,6 +100,21 @@ def _add_evaluate_parser(subparsers: argparse._SubParsersAction) -> None:
     parser.add_argument("--judge-sample", type=int, default=30)
 
 
+def _add_serve_parser(subparsers: argparse._SubParsersAction) -> None:
+    """Register the ``serve`` subcommand for the FastAPI backend.
+
+    Args:
+        subparsers: The subparser registry to add to.
+    """
+
+    parser = subparsers.add_parser(
+        "serve", help="Run the FastAPI /parse backend for the simulator."
+    )
+    parser.add_argument("--host", default="127.0.0.1")
+    parser.add_argument("--port", type=int, default=8000)
+    parser.add_argument("--reload", action="store_true")
+
+
 def build_parser() -> argparse.ArgumentParser:
     """Build the top-level argument parser with all subcommands.
 
@@ -107,6 +128,7 @@ def build_parser() -> argparse.ArgumentParser:
     _add_validate_parser(subparsers)
     _add_finetune_parser(subparsers)
     _add_evaluate_parser(subparsers)
+    _add_serve_parser(subparsers)
     return parser
 
 
@@ -164,6 +186,10 @@ def main(argv: Optional[List[str]] = None) -> int:
             do_judge=not args.no_judge,
             judge_sample=args.judge_sample,
         )
+        return 0
+
+    if args.command == "serve":
+        server.serve(host=args.host, port=args.port, reload=args.reload)
         return 0
 
     parser.error(f"Unknown command: {args.command}")

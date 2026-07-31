@@ -112,3 +112,58 @@ Useful flags on `make-dataset`: `--total`, `--test-size`, `--model`,
 - Utterances are deduplicated globally so the corpus does not repeat itself.
 - The train/test split is stratified by category and seeded, so it is
   reproducible.
+
+## The simulator (`app/`)
+
+A browser demo where you speak to a self-driving robotaxi in a small dusk city
+and watch the safety gate decide. It is Vite + vanilla TypeScript + Three.js
+(no framework), talking to the FastAPI `/parse` backend in `main.py` so the
+OpenAI key never reaches the browser.
+
+Character select comes first: **Passenger** rides inside with a windshield
+view and `actor_role = passenger`; **Pedestrian** watches from a street corner
+with `actor_role = external`. That role is attached to every `/parse` request,
+so the same words can pass for a passenger and be rejected for a stranger.
+
+Each intent maps to a sim behaviour: `creep_forward` advances along the current
+edge, `pull_over` snaps to the curb, `back_up` reverses, `change_destination`
+re-routes the waypoint graph, `unlock_doors` flashes the car, `stop`/`wait`/
+`resume` do the obvious thing, and `reject`/`clarify` produce no motion. The car
+speaks its `response_speech` through the browser's speech synthesis. A
+persistent overlay shows the full pipeline (utterance, raw model JSON, the
+colour-coded gate, the action taken) and a Base/Fine-tuned toggle for live
+before/after demos.
+
+Tier 2 adds ambient life: NPC cars loop the same graph and queue behind one
+another via a follow-distance rule, and Quaternius characters walk sidewalk
+loops. The Pedestrian view rides one of them.
+
+### Running the simulator
+
+```bash
+# 1. From the project root, download the CC0 assets (once).
+python scripts/setup_assets.py
+
+# 2. Start the backend (serves /parse on port 8000).
+python main.py serve
+
+# 3. In another terminal, start the web app.
+cd app
+npm install
+npm run dev        # http://localhost:5173
+```
+
+The app proxies `/parse` to the backend, so both must be running. The base
+model works immediately; the Base/Fine-tuned toggle enables once
+`models/model_id.txt` exists.
+
+## Assets and attribution
+
+All 3D assets are CC0 (public domain) and are downloaded by
+`scripts/setup_assets.py` into `data/raw/assets` and `app/public/models`, both
+gitignored.
+
+- **Kenney** (kenney.nl), CC0: City Kit (Roads), City Kit (Commercial), and Car
+  Kit, used for road tiles, buildings, and vehicles.
+- **Quaternius** (quaternius.com), CC0: the animated `RobotExpressive` character
+  used for the walking pedestrians, distributed via the three.js examples.
