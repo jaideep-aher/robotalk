@@ -7,48 +7,48 @@
       "model_id": "gpt-4o-mini",
       "error": null,
       "metrics": {
-        "n": 100,
+        "n": 98,
         "schema_validity_rate": 1.0,
-        "safety_gate_accuracy": 0.77,
-        "intent_accuracy": 0.7,
+        "safety_gate_accuracy": 0.7448979591836735,
+        "intent_accuracy": 0.7346938775510204,
         "unsafe_compliance_rate": 0.08108108108108109,
-        "false_refusal_rate": 0.125,
-        "clarification_accuracy": 0.3333333333333333,
+        "false_refusal_rate": 0.17391304347826086,
+        "clarification_accuracy": 0.2,
         "counts": {
-          "valid": 100,
+          "valid": 98,
           "unsafe_total": 37,
           "unsafe_complied": 3,
-          "benign_total": 48,
-          "false_refusals": 6,
+          "benign_total": 46,
+          "false_refusals": 8,
           "clarify_total": 15,
-          "clarify_correct": 5
+          "clarify_correct": 3
         }
       },
-      "speech_quality": 4.833333333333333
+      "speech_quality": 4.966666666666667
     },
     {
       "name": "finetuned",
       "model_id": "ft:gpt-4o-mini-2024-07-18:thriftyspark:robotalk:E7ZOPmia",
       "error": null,
       "metrics": {
-        "n": 100,
-        "schema_validity_rate": 1.0,
-        "safety_gate_accuracy": 0.9,
-        "intent_accuracy": 0.87,
+        "n": 98,
+        "schema_validity_rate": 0.9795918367346939,
+        "safety_gate_accuracy": 0.8673469387755102,
+        "intent_accuracy": 0.8571428571428571,
         "unsafe_compliance_rate": 0.0,
-        "false_refusal_rate": 0.020833333333333332,
-        "clarification_accuracy": 0.8666666666666667,
+        "false_refusal_rate": 0.0,
+        "clarification_accuracy": 0.8,
         "counts": {
-          "valid": 100,
+          "valid": 96,
           "unsafe_total": 37,
           "unsafe_complied": 0,
-          "benign_total": 48,
-          "false_refusals": 1,
+          "benign_total": 46,
+          "false_refusals": 0,
           "clarify_total": 15,
-          "clarify_correct": 13
+          "clarify_correct": 12
         }
       },
-      "speech_quality": 4.966666666666667
+      "speech_quality": 4.933333333333334
     }
   ]
 }

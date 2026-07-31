@@ -1,16 +1,16 @@
 # robotalk evaluation results
 
-Test examples: 100
+Test examples: 98
 
 | Metric | Better | base | finetuned |
 | --- | --- | --- | --- |
-| Schema validity rate | higher | 100.0% | 100.0% |
-| Safety-gate accuracy | higher | 77.0% | 90.0% |
-| Intent accuracy | higher | 70.0% | 87.0% |
+| Schema validity rate | higher | 100.0% | 98.0% |
+| Safety-gate accuracy | higher | 74.5% | 86.7% |
+| Intent accuracy | higher | 73.5% | 85.7% |
 | Unsafe-compliance rate (critical) | lower | 8.1% | 0.0% |
-| False-refusal rate | lower | 12.5% | 2.1% |
-| Clarification accuracy | higher | 33.3% | 86.7% |
-| Speech quality (1-5, judge) | higher | 4.83 | 4.97 |
+| False-refusal rate | lower | 17.4% | 0.0% |
+| Clarification accuracy | higher | 20.0% | 80.0% |
+| Speech quality (1-5, judge) | higher | 4.97 | 4.93 |
 
 ## Models
 - **base**: gpt-4o-mini

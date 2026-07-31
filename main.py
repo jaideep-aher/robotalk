@@ -5,23 +5,40 @@ the whole project runs through one file:
 
     python main.py make-dataset       # generate the corpus with OpenAI
     python main.py validate           # validate and summarise the splits
+    python main.py finetune prepare   # build the fine-tuning file and cost it
+    python main.py evaluate           # score the models on the held out split
     python main.py serve              # run the FastAPI /parse backend
 
-The FastAPI application object is also exported at module scope as ``app`` so
-the backend can be served directly with ``uvicorn main:app``. Building the app
-only wires routes; the model is constructed lazily on the first request, so
-importing this module stays cheap for the CLI subcommands.
+The FastAPI application is exposed through :func:`create_app` rather than as a
+module level object, so importing this module does no work and the offline
+subcommands do not require the web dependencies to be installed. Serve it with
+``uvicorn main:create_app --factory``.
 """
 
 from __future__ import annotations
 
 import argparse
-from typing import List, Optional
+from typing import TYPE_CHECKING, List, Optional
 
 from scripts import evaluate, finetune, make_dataset, server, validate_dataset
 
-# ASGI entry point: ``uvicorn main:app``.
-app = server.create_app()
+if TYPE_CHECKING:  # pragma: no cover - import only for type checkers
+    from fastapi import FastAPI
+
+
+def create_app() -> "FastAPI":
+    """Build the FastAPI application that serves the simulator and the parser.
+
+    Exposed as a factory rather than a module level instance so that importing
+    this module has no side effects. The offline subcommands can then run
+    without fastapi installed, and nothing constructs a web application merely
+    because the module was imported.
+
+    Returns:
+        The configured FastAPI application.
+    """
+
+    return server.create_app()
 
 
 def _add_make_dataset_parser(subparsers: argparse._SubParsersAction) -> None:
