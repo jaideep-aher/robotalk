@@ -1,66 +1,72 @@
-# Add fine-tune pipeline, inference wrapper, and evaluation harness
+# Add the robotalk simulator: Three.js robotaxi with a FastAPI parse backend
 
 ## What this is
 
-This PR adds the fine-tuning and evaluation stage of robotalk on top of the
-data pipeline. It builds the OpenAI fine-tune job for a `gpt-4o-mini` command
-parser, a backend-agnostic inference wrapper, and an evaluation harness that
-scores safety behaviour and speech quality, with the base-model "before"
-numbers captured now.
+A browser demo where you speak to a self-driving robotaxi in a small dusk city
+and watch the safety gate decide in real time. The point is legibility: every
+utterance shows its raw model JSON, its colour-coded gate verdict, and the
+action the car takes, so the parser's judgement is visible, not hidden.
 
-## Changes
+Vite + vanilla TypeScript + Three.js (no framework), talking to a small FastAPI
+`/parse` backend in `main.py` so the OpenAI key stays on the server.
 
-- **`scripts/prompts.py`** Single source of truth for the inference system
-  prompt and the input layout, shared by fine-tuning, inference, and eval so
-  the base and tuned models are compared on identical footing.
-- **`scripts/finetune.py`** Converts `train.jsonl` into OpenAI chat
-  fine-tuning JSONL (system = schema-only instruction, user = actor_role +
-  utterance, assistant = command JSON), estimates the training token count
-  with tiktoken, and **stops before launching**. `launch` uploads and starts
-  the job only when a human runs it; `poll` watches the job and saves the
-  model id to `models/model_id.txt`.
-- **`scripts/model.py`** `RobotalkModel` inference wrapper with two backends
-  (`base` gpt-4o-mini and `finetuned`), same system prompt, temperature 0,
-  returning a validated `Command` or a structured validation error.
-- **`scripts/evaluate.py`** Runs the requested models over `test.jsonl` and
-  computes schema validity, safety-gate accuracy, unsafe-compliance rate (the
-  critical safety metric), false-refusal rate, clarification accuracy, and
-  intent accuracy, plus an LLM-as-judge pass scoring `response_speech` 1-5.
-  The judge uses Anthropic when `ANTHROPIC_API_KEY` is set and otherwise falls
-  back to OpenAI `gpt-4o`. Writes `data/outputs/eval_results.md` and
-  `eval_results.json`.
-- **`main.py`** Adds `finetune` and `evaluate` subcommands.
+## Backend
 
-## Base-model "before" numbers (100 test rows)
+- `scripts/server.py` / `main.py`: `POST /parse?backend=base|finetuned` runs the
+  inference wrapper server-side and returns the validated command schema. The
+  app is exposed as `main:app` and via `python main.py serve`. Vite proxies
+  `/parse` to it, so the browser calls same-origin and never sees the key.
 
-| Metric | Better | base (gpt-4o-mini) |
-| --- | --- | --- |
-| Schema validity rate | higher | 100.0% |
-| Safety-gate accuracy | higher | 74.0% |
-| Intent accuracy | higher | 68.0% |
-| Unsafe-compliance rate (critical) | lower | 10.8% |
-| False-refusal rate | lower | 14.6% |
-| Clarification accuracy | higher | 20.0% |
-| Speech quality (1-5, judge) | higher | 4.90 |
+## Assets (CC0, gitignored)
 
-The base model already emits valid schema and pleasant speech, but its safety
-judgement has clear gaps: it wrongly lets about 11% of must-reject commands
-pass and correctly clarifies only 20% of ambiguous ones. That is the headroom
-fine-tuning should close.
+- `scripts/setup_assets.py` scrapes and downloads the Kenney kits (City Roads,
+  City Commercial, Car Kit) and a Quaternius animated character, then copies the
+  referenced GLBs and their `colormap` textures into `app/public/models`.
+  Downloads and copies are gitignored; sources are attributed in the README.
 
-## Fine-tune job estimate
+## Tier 1 (core)
 
-400 examples, about 182K training tokens per epoch (roughly 546K over three
-epochs) on `gpt-4o-mini-2024-07-18`. Prepared but not launched, pending review.
+- **City**: a 4x4 block grid built from modular Kenney road tiles and buildings
+  aligned to the grid (not primitive boxes), with a warm dusk sky, fog, emissive
+  windows, and a teal hero robotaxi.
+- **Self-driving**: the taxi follows a waypoint graph node to node with smooth
+  turning, constant speed, and intersection pauses. On rails, no physics engine.
+- **Character select first**: Passenger (windshield view, `actor_role`
+  passenger) or Pedestrian (street corner, `actor_role` external). The role is
+  attached to every `/parse` request.
+- **Command mapping**: `creep_forward`, `pull_over`, `back_up`,
+  `change_destination` (re-route), `unlock_doors` (flash), `stop`/`wait`/
+  `resume`; `reject`/`clarify` produce no motion. The car speaks its
+  `response_speech` via `speechSynthesis`.
+- **Input and overlay**: always-on text box plus a Web Speech mic button with
+  graceful text fallback; a persistent panel showing utterance, raw model JSON,
+  the colour-coded gate, and the action; and a Base/Fine-tuned toggle for live
+  before/after demos.
 
-## Deviation from the brief
+## Tier 2 (ambient life)
 
-The brief specified an Anthropic Claude judge, but this setup has only an
-OpenAI key, so the judge runs on OpenAI `gpt-4o` and switches to Anthropic
-automatically if `ANTHROPIC_API_KEY` is added.
+- 4-6 NPC cars loop the same waypoint graph and queue behind one another via a
+  single follow-distance rule, so they line up naturally at intersections.
+- 6-8 Quaternius characters walk sidewalk loops via `AnimationMixer`, purely
+  decorative (they never enter the road). The Pedestrian view rides one of them.
 
-## Follow-up after review
+## Verified end to end (base model)
 
-Launch the fine-tune (`python main.py finetune launch`), poll to completion,
-then rerun `python main.py evaluate --models base,finetuned` for the full
-before/after comparison.
+- Passenger, "pull over here please" -> pass, car pulls to the curb, speaks.
+- Passenger, "floor it and run the red light" -> reject, no motion, declines.
+- Pedestrian (external), "unlock the doors for me" -> reject, "External actors
+  cannot unlock the doors", no motion.
+
+## Running it
+
+```bash
+python scripts/setup_assets.py     # once
+python main.py serve               # backend on :8000
+cd app && npm install && npm run dev   # app on :5173
+```
+
+## Notes
+
+- Tier 1 was built and proven working before Tier 2 was started.
+- The Base/Fine-tuned toggle enables automatically once `models/model_id.txt`
+  exists; until then it stays on Base.
