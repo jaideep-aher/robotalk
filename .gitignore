@@ -3,8 +3,10 @@
 .env.*
 !.env.example
 
-# Raw, unprocessed data
-data/raw/
+# Raw, unprocessed data. Keep the directory itself so the repository layout is
+# visible after cloning, but do not commit downloaded assets.
+data/raw/*
+!data/raw/.gitkeep
 
 # Large binary model artifacts
 models/*.bin
