@@ -120,10 +120,25 @@ and watch the safety gate decide. It is Vite + vanilla TypeScript + Three.js
 (no framework), talking to the FastAPI `/parse` backend in `main.py` so the
 OpenAI key never reaches the browser.
 
-Character select comes first: **Passenger** rides inside with a windshield
-view and `actor_role = passenger`; **Pedestrian** watches from a street corner
-with `actor_role = external`. That role is attached to every `/parse` request,
-so the same words can pass for a passenger and be rejected for a stranger.
+Character select comes first, and the point of view can be switched at any time
+from the panel:
+
+- **Passenger** rides inside with a windshield view (`actor_role = passenger`).
+- **Pedestrian** puts you on the street as a character you walk yourself with
+  W/S (or up/down) and turn with A/D (`actor_role = external`).
+- **Overhead** is a chase camera behind the car, the clearest view for watching
+  it obey or refuse.
+
+The role follows the view, because who is speaking is exactly what the safety
+gate reasons about: the same words can pass for a passenger and be rejected for
+a stranger on the street.
+
+The city has eight named San Francisco landmarks (Golden Gate Bridge, Y
+Combinator, Corgi Cafe, Mission Dolores, Salesforce Tower, Ferry Building,
+Oracle Park, Fisherman's Wharf), shown on floating labels and listed in a
+dropdown, so "take me to the Ferry Building" routes the cab there for real. A
+**Call robotaxi** button sends the cab to pick you up wherever you are standing,
+and one-click example commands demonstrate each gate outcome.
 
 Each intent maps to a sim behaviour: `creep_forward` advances along the current
 edge, `pull_over` snaps to the curb, `back_up` reverses, `change_destination`
