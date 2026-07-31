@@ -28,6 +28,12 @@ export class CharacterSelect {
       <div class="cs-doc">
         <div class="cs-masthead">
           <span class="cs-wordmark">robotalk</span>
+          <div class="lp-byline">
+            <span class="lp-byline-text">Built by Jaideep Aher</span>
+            <a class="lp-portfolio" href="https://aher.dev" target="_blank" rel="noopener">
+              aher.dev
+            </a>
+          </div>
         </div>
         <p class="cs-eyebrow">Choose a point of view</p>
         <h1 class="cs-title">Who is speaking to the car?</h1>

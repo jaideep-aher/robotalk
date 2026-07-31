@@ -11,13 +11,13 @@
 import * as THREE from "three";
 
 /** How far a lane centre sits from the road centreline, in metres. */
-export const LANE_OFFSET = 1.3;
+export const LANE_OFFSET = 3.0;
 
 /**
  * Half the width of a lane, used to decide whether another vehicle is in the
  * same lane or the oncoming one. Below this counts as the same lane.
  */
-export const LANE_HALF_WIDTH = 1.9;
+export const LANE_HALF_WIDTH = 2.9;
 
 /**
  * The rightward direction for a heading, looking down on the map.
@@ -89,4 +89,52 @@ export function blocksAhead(
   // Right-hand component of the offset, which is the across-road distance.
   const across = dx * Math.cos(heading) - dz * Math.sin(heading);
   return Math.abs(across) < LANE_HALF_WIDTH;
+}
+
+/**
+ * A point on the quadratic curve that joins two lane segments at a corner.
+ *
+ * Driving straight from one lane line to the next perpendicular one makes the
+ * body slide sideways across the junction, because the position moves in a
+ * straight line while the heading eases separately. Bending the path through
+ * the corner point instead means the car sweeps the turn the way a real one
+ * does, and the heading it derives from the path matches what it is doing.
+ *
+ * @param entry - Where the vehicle enters the junction, in its arriving lane.
+ * @param corner - The junction centre, used as the control point.
+ * @param exit - Where the vehicle leaves, in its departing lane.
+ * @param t - Progress through the turn, 0 to 1.
+ * @param out - Optional vector to write into.
+ * @returns The position along the curve.
+ */
+export function cornerPoint(
+  entry: THREE.Vector3,
+  corner: THREE.Vector3,
+  exit: THREE.Vector3,
+  t: number,
+  out = new THREE.Vector3()
+): THREE.Vector3 {
+  const inv = 1 - t;
+  const a = inv * inv;
+  const b = 2 * inv * t;
+  const c = t * t;
+  return out.set(
+    a * entry.x + b * corner.x + c * exit.x,
+    0,
+    a * entry.z + b * corner.z + c * exit.z
+  );
+}
+
+/**
+ * Whether two consecutive legs form a turn rather than a straight run.
+ *
+ * @param fromHeading - Heading on the arriving leg.
+ * @param toHeading - Heading on the departing leg.
+ * @returns True if the direction changes enough to need a swept corner.
+ */
+export function isTurn(fromHeading: number, toHeading: number): boolean {
+  let delta = toHeading - fromHeading;
+  while (delta > Math.PI) delta -= Math.PI * 2;
+  while (delta < -Math.PI) delta += Math.PI * 2;
+  return Math.abs(delta) > 0.35;
 }
