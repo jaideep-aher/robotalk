@@ -70,10 +70,32 @@ export const BUILDING_MODELS = [
   "building-f",
   "building-g",
   "building-h",
+  "building-i",
+  "building-j",
+  "building-k",
+  "building-l",
+  "building-m",
+  "building-n",
   "building-skyscraper-a",
   "building-skyscraper-b",
   "building-skyscraper-c",
+  "building-skyscraper-d",
+  "building-skyscraper-e",
 ] as const;
+
+/** Street furniture placed at intersections to break up the grid. */
+export const PROP_MODELS = [
+  "light-square",
+  "light-curved",
+  "light-square-double",
+] as const;
+
+/**
+ * How much a building may be stretched vertically. Kenney blocks are uniform
+ * heights, so a little per-instance variation is what stops the skyline
+ * reading as one repeated shape.
+ */
+export const BUILDING_HEIGHT_JITTER = { min: 0.85, max: 1.9 } as const;
 
 /** NPC car GLB basenames (Tier 2). */
 export const NPC_CAR_MODELS = [

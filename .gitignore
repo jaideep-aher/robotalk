@@ -20,11 +20,14 @@ __pycache__/
 venv/
 .env/
 
-# Web app: dependencies, build output, and downloaded CC0 assets
+# Web app: dependencies and build output
 app/node_modules/
 app/dist/
 app/.vite/
-app/public/models/
+
+# The downloaded CC0 models are committed on purpose: they are only ~5 MB and
+# shipping them keeps the deployed build from depending on kenney.nl being up.
+# scripts/setup_assets.py still regenerates them from scratch.
 
 # OS and editor cruft
 .DS_Store

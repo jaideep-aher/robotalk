@@ -59,6 +59,23 @@ def create_app():
 
     app = FastAPI(title="robotalk", version="0.1.0")
 
+    def _mount_frontend() -> None:
+        """Serve the built simulator from the same origin as the API.
+
+        In development Vite serves the app and proxies ``/parse`` here. In
+        production there is no Vite, so the compiled bundle in ``app/dist`` is
+        mounted at the root instead, which keeps the browser same-origin and
+        means the OpenAI key still never leaves the server.
+        """
+
+        from pathlib import Path
+
+        from fastapi.staticfiles import StaticFiles
+
+        dist = Path(__file__).resolve().parents[1] / "app" / "dist"
+        if dist.is_dir():
+            app.mount("/", StaticFiles(directory=str(dist), html=True), name="app")
+
     @app.get("/health")
     def health() -> dict:
         """Report liveness and which backends are ready.
@@ -119,20 +136,31 @@ def create_app():
             "command": result.command.model_dump(mode="json"),
         }
 
+    # Mounted last so the API routes above take precedence over the catch-all.
+    _mount_frontend()
     return app
 
 
 def serve(host: str = "127.0.0.1", port: int = 8000, reload: bool = False) -> None:
     """Run the backend with uvicorn.
 
+    Hosting platforms hand the port over in ``$PORT`` and expect the process to
+    listen on all interfaces, so both are honoured when present.
+
     Args:
         host: Bind host.
-        port: Bind port.
+        port: Bind port, overridden by ``$PORT`` when set.
         reload: Whether to enable autoreload (development only).
     """
 
+    import os
+
     import uvicorn
 
+    env_port = os.environ.get("PORT")
+    if env_port:
+        port = int(env_port)
+        host = "0.0.0.0"
     uvicorn.run("main:app", host=host, port=port, reload=reload)
 
 
