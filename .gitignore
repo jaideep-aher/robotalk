@@ -1,0 +1,22 @@
+# Secrets and API keys
+.env
+.env.*
+!.env.example
+
+# Raw, unprocessed data
+data/raw/
+
+# Large binary model artifacts
+models/*.bin
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+.env/
+
+# OS and editor cruft
+.DS_Store
+.ipynb_checkpoints/
