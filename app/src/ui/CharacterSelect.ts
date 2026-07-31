@@ -25,23 +25,31 @@ export class CharacterSelect {
     this.element = document.createElement("div");
     this.element.className = "character-select";
     this.element.innerHTML = `
-      <div class="cs-inner">
-        <h1 class="cs-title">robotalk</h1>
-        <p class="cs-sub">
-          A self-driving cab that obeys what you say, and refuses what it should.
-          Choose who is speaking to it: authority changes the answer.
+      <div class="cs-doc">
+        <div class="cs-masthead">
+          <span class="cs-wordmark">robotalk</span>
+        </div>
+        <p class="cs-eyebrow">Choose a point of view</p>
+        <h1 class="cs-title">Who is speaking to the car?</h1>
+        <p class="cs-lede">
+          The same sentence gets a different answer depending on the answer to
+          that question. You can switch at any time once you are in.
         </p>
         <div class="cs-cards">
           <button class="cs-card" data-mode="passenger">
-            <span class="cs-emoji">🧑‍💼</span>
             <span class="cs-card-title">Passenger</span>
-            <span class="cs-card-desc">Ride inside. You have authority over the trip. Commands can pass.</span>
+            <span class="cs-card-desc">
+              You are riding inside, so you have authority over the trip.
+              Destinations, doors and stops all pass.
+            </span>
             <span class="cs-role">actor_role = passenger</span>
           </button>
           <button class="cs-card" data-mode="pedestrian">
-            <span class="cs-emoji">🚶</span>
             <span class="cs-card-title">Pedestrian</span>
-            <span class="cs-card-desc">Walk the streets yourself with W A S D and hail the cab. You are an external actor, so the gate is stricter.</span>
+            <span class="cs-card-desc">
+              You are on the street, walking with W A S D. The car grants
+              reasonable courtesy moves and refuses door and trip control.
+            </span>
             <span class="cs-role">actor_role = external</span>
           </button>
         </div>

@@ -1,15 +1,26 @@
 /* Dusk-themed UI for the robotalk simulator. */
 
 :root {
-  --panel-bg: rgba(24, 21, 38, 0.82);
-  --panel-border: rgba(255, 210, 138, 0.22);
-  --text: #f2ecff;
-  --muted: #a99fc8;
-  --pass: #34d399;
-  --reject: #fb7185;
-  --clarify: #fbbf24;
-  --teal: #14b8a6;
-  font-family: "Inter", system-ui, -apple-system, sans-serif;
+  /* Shared with the landing page, so the simulator reads as the same product. */
+  --ink: #23233c;
+  --ink-soft: #5d6e83;
+  --ink-quiet: #7c899a;
+  --line: #e5e9f0;
+  --surface: #ffffff;
+  --surface-tint: #fafafb;
+  --blue: #0077ff;
+  --blue-press: #006fee;
+  --mint: #00e89d;
+
+  --panel-bg: rgba(255, 255, 255, 0.96);
+  --panel-border: #e5e9f0;
+  --text: #23233c;
+  --muted: #5d6e83;
+  --pass: #087f5b;
+  --reject: #b42318;
+  --clarify: #a35b00;
+  --teal: #0077ff;
+  font-family: "Nunito Sans", "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
 }
 
 * {
@@ -21,8 +32,10 @@ body {
   margin: 0;
   height: 100%;
   overflow: hidden;
-  background: #14121f;
+  background: #ffffff;
   color: var(--text);
+  letter-spacing: -0.015em;
+  -webkit-font-smoothing: antialiased;
 }
 
 #app {
@@ -42,101 +55,129 @@ body {
   display: flex;
   align-items: center;
   justify-content: center;
-  background: radial-gradient(circle at 50% 30%, #3a2f56 0%, #17131f 70%);
+  background: #ffffff;
   z-index: 20;
+  overflow-y: auto;
 }
 
-.cs-inner {
-  text-align: center;
-  max-width: 760px;
-  padding: 24px;
+.cs-doc {
+  max-width: 940px;
+  padding: 54px;
+}
+
+.cs-masthead {
+  margin-bottom: 72px;
+}
+
+.cs-wordmark {
+  font-size: 20px;
+  font-weight: 500;
+  letter-spacing: -0.02em;
+  color: var(--ink);
+  padding-bottom: 3px;
+  border-bottom: 2px solid var(--mint);
+}
+
+.cs-eyebrow {
+  margin: 0 0 14px;
+  font-size: 12px;
+  font-weight: 500;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  color: var(--ink-soft);
 }
 
 .cs-title {
-  font-size: 54px;
-  margin: 0;
-  letter-spacing: -1px;
-  color: var(--teal);
-  text-shadow: 0 0 24px rgba(20, 184, 166, 0.5);
+  margin: 0 0 20px;
+  font-size: clamp(32px, 4.6vw, 54px);
+  font-weight: 400;
+  line-height: 1.08;
+  letter-spacing: -0.03em;
+  color: var(--ink);
 }
 
-.cs-sub {
-  color: var(--muted);
-  margin: 8px 0 28px;
-  font-size: 17px;
+.cs-lede {
+  margin: 0 0 54px;
+  font-size: 18px;
+  line-height: 1.55;
+  color: var(--ink-soft);
+  max-width: 52ch;
 }
 
 .cs-cards {
-  display: flex;
-  gap: 20px;
-  justify-content: center;
-  flex-wrap: wrap;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1px;
+  background: var(--line);
+  border: 1px solid var(--line);
 }
 
 .cs-card {
-  width: 300px;
-  background: var(--panel-bg);
-  border: 1px solid var(--panel-border);
-  border-radius: 16px;
-  padding: 26px 22px;
-  color: var(--text);
+  background: #ffffff;
+  border: none;
+  padding: 36px 32px;
+  text-align: left;
   cursor: pointer;
   display: flex;
   flex-direction: column;
-  gap: 10px;
-  align-items: center;
-  transition: transform 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease;
+  gap: 12px;
+  font: inherit;
+  color: var(--ink);
+  transition: background 0.15s ease;
 }
 
 .cs-card:hover {
-  transform: translateY(-4px);
-  border-color: var(--teal);
-  box-shadow: 0 14px 40px rgba(0, 0, 0, 0.4);
+  background: var(--surface-tint);
 }
 
-.cs-emoji {
-  font-size: 44px;
+.cs-card:focus-visible {
+  outline: 4px solid var(--mint);
+  outline-offset: -4px;
 }
 
 .cs-card-title {
-  font-size: 22px;
-  font-weight: 700;
+  font-size: 24px;
+  font-weight: 400;
+  letter-spacing: -0.02em;
 }
 
 .cs-card-desc {
-  color: var(--muted);
-  font-size: 14px;
-  line-height: 1.5;
+  font-size: 15px;
+  line-height: 1.6;
+  color: var(--ink-soft);
 }
 
 .cs-role {
   margin-top: 6px;
-  font-family: ui-monospace, monospace;
-  font-size: 12px;
-  color: var(--teal);
-  background: rgba(20, 184, 166, 0.12);
-  padding: 4px 10px;
-  border-radius: 999px;
+  font-family: ui-monospace, "SF Mono", Menlo, monospace;
+  font-size: 12.5px;
+  color: var(--blue);
+}
+
+@media (max-width: 720px) {
+  .cs-cards { grid-template-columns: 1fr; }
+  .cs-doc { padding: 30px; }
+  .cs-masthead { margin-bottom: 40px; }
 }
 
 /* Overlay ---------------------------------------------------------------- */
 
 .overlay {
   position: fixed;
-  left: 16px;
-  bottom: 16px;
-  width: 380px;
-  max-width: calc(100vw - 32px);
-  background: var(--panel-bg);
-  border: 1px solid var(--panel-border);
-  border-radius: 14px;
-  padding: 14px;
-  backdrop-filter: blur(10px);
+  left: 20px;
+  top: 20px;
+  bottom: 20px;
+  width: 384px;
+  max-width: calc(100vw - 40px);
+  background: #ffffff;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  padding: 22px;
   z-index: 10;
+  box-shadow: 0 18px 48px rgba(16, 24, 40, 0.18);
 }
 
 .overlay {
-  max-height: calc(100vh - 32px);
   overflow-y: auto;
 }
 
@@ -162,9 +203,9 @@ body {
 
 .ov-view {
   flex: 1;
-  background: rgba(255, 255, 255, 0.06);
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  color: var(--muted);
+  background: #ffffff;
+  border: 1px solid var(--line);
+  color: var(--ink-soft);
   border-radius: 8px;
   padding: 7px 4px;
   font-size: 12.5px;
@@ -172,15 +213,15 @@ body {
 }
 
 .ov-view:hover {
-  border-color: var(--teal);
-  color: var(--text);
+  background: var(--surface-tint);
+  color: var(--ink);
 }
 
 .ov-view-active {
-  background: rgba(20, 184, 166, 0.22);
-  border-color: var(--teal);
-  color: #b6fff2;
-  font-weight: 600;
+  background: var(--ink);
+  border-color: var(--ink);
+  color: #ffffff;
+  font-weight: 500;
 }
 
 .ov-hint {
@@ -196,9 +237,9 @@ body {
 
 .ov-hail {
   flex: 1;
-  background: rgba(20, 184, 166, 0.18);
-  border: 1px solid var(--teal);
-  color: #b6fff2;
+  background: var(--blue-press);
+  border: 1px solid var(--blue-press);
+  color: #ffffff;
   border-radius: 8px;
   padding: 8px 10px;
   font-size: 13px;
@@ -208,13 +249,14 @@ body {
 }
 
 .ov-hail:hover {
-  background: rgba(20, 184, 166, 0.3);
+  background: #ffffff;
+  color: var(--blue-press);
 }
 
 .ov-resume {
-  background: rgba(255, 255, 255, 0.08);
-  border: 1px solid rgba(255, 255, 255, 0.16);
-  color: var(--text);
+  background: #ffffff;
+  border: 1px solid var(--line);
+  color: var(--ink);
   border-radius: 8px;
   padding: 8px 12px;
   font-size: 13px;
@@ -223,15 +265,15 @@ body {
 }
 
 .ov-resume:hover {
-  border-color: var(--teal);
+  background: var(--surface-tint);
 }
 
 .ov-places {
   width: 100%;
   min-width: 0;
-  background: rgba(0, 0, 0, 0.3);
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  color: var(--text);
+  background: #ffffff;
+  border: 1px solid var(--line);
+  color: var(--ink);
   border-radius: 8px;
   padding: 8px 6px;
   font-size: 12.5px;
@@ -240,7 +282,7 @@ body {
 
 .ov-status {
   font-size: 12.5px;
-  color: #b6fff2;
+  color: var(--blue);
 }
 
 .ov-examples {
@@ -251,9 +293,9 @@ body {
 }
 
 .ov-chip {
-  background: rgba(255, 255, 255, 0.06);
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  color: var(--muted);
+  background: #ffffff;
+  border: 1px solid var(--line);
+  color: var(--ink-soft);
   border-radius: 999px;
   padding: 4px 9px;
   font-size: 11.5px;
@@ -261,17 +303,17 @@ body {
 }
 
 .ov-chip:hover {
-  border-color: var(--teal);
-  color: var(--text);
+  background: var(--surface-tint);
+  color: var(--ink);
 }
 
 /* Scenarios */
 
 .ov-scenarios {
   width: 100%;
-  background: rgba(0, 0, 0, 0.3);
-  border: 1px solid rgba(255, 255, 255, 0.14);
-  color: var(--text);
+  background: #ffffff;
+  border: 1px solid var(--line);
+  color: var(--ink);
   border-radius: 8px;
   padding: 8px;
   font-size: 13px;
@@ -285,8 +327,8 @@ body {
 }
 
 .ov-situation-on {
-  color: #ffd9a8;
-  background: rgba(255, 178, 107, 0.12);
+  color: #7a4a00;
+  background: #fff6e8;
   border-left: 3px solid var(--clarify);
   padding: 7px 9px;
   border-radius: 0 8px 8px 0;
@@ -294,18 +336,18 @@ body {
 
 /* Expected-outcome tint on scenario chips */
 .ov-chip-pass {
-  border-color: rgba(52, 211, 153, 0.55);
-  color: #b7f7de;
+  border-color: #9bdcc4;
+  color: #08663f;
 }
 
 .ov-chip-reject {
-  border-color: rgba(251, 113, 133, 0.55);
-  color: #ffc8d1;
+  border-color: #f0b4ae;
+  color: #92231a;
 }
 
 .ov-chip-clarify {
-  border-color: rgba(251, 191, 36, 0.55);
-  color: #ffe4a8;
+  border-color: #e8c98a;
+  color: #7a4a00;
 }
 
 .ov-because {
@@ -318,9 +360,9 @@ body {
   font-size: 12px;
   line-height: 1.5;
   color: var(--muted);
-  border-left: 3px solid var(--teal);
+  border-left: 3px solid var(--blue);
   padding: 7px 9px;
-  background: rgba(20, 184, 166, 0.08);
+  background: #f2f8ff;
   border-radius: 0 8px 8px 0;
 }
 
@@ -331,46 +373,62 @@ body {
 .ov-input {
   flex: 1;
   min-width: 0;
-  background: rgba(0, 0, 0, 0.3);
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  border-radius: 9px;
-  color: var(--text);
-  padding: 9px 11px;
+  background: #ffffff;
+  border: 1px solid var(--line);
+  border-radius: 3px;
+  color: var(--ink);
+  padding: 10px 12px;
   font-size: 14px;
+  font-family: inherit;
 }
 
-.ov-input:focus {
-  outline: none;
-  border-color: var(--teal);
+.ov-input:focus-visible {
+  outline: 4px solid var(--mint);
+  outline-offset: 1px;
+  border-color: var(--blue);
 }
 
 .ov-send,
 .ov-mic,
 .ov-backend {
-  background: rgba(255, 255, 255, 0.08);
-  border: 1px solid rgba(255, 255, 255, 0.14);
-  color: var(--text);
-  border-radius: 9px;
-  padding: 9px 12px;
+  background: #ffffff;
+  border: 1px solid var(--line);
+  color: var(--ink);
+  border-radius: 3px;
+  padding: 10px 13px;
   font-size: 14px;
+  font-family: inherit;
   cursor: pointer;
   white-space: nowrap;
+  transition: background 0.15s ease;
 }
 
-.ov-send:hover,
+.ov-send {
+  background: var(--blue-press);
+  border-color: var(--blue-press);
+  color: #ffffff;
+  font-weight: 500;
+}
+
+.ov-send:hover {
+  background: #ffffff;
+  color: var(--blue-press);
+}
+
 .ov-mic:hover,
 .ov-backend:hover {
-  border-color: var(--teal);
+  background: var(--surface-tint);
 }
 
 .ov-backend[data-backend="finetuned"] {
-  background: rgba(20, 184, 166, 0.2);
-  border-color: var(--teal);
-  color: #b6fff2;
+  background: #eafaf3;
+  border-color: var(--mint);
+  color: #05614a;
+  font-weight: 500;
 }
 
 .ov-mic-active {
-  background: rgba(251, 113, 133, 0.3);
+  background: #fdecea;
   border-color: var(--reject);
 }
 
@@ -416,7 +474,7 @@ body {
 }
 
 .ov-speech {
-  color: #b6fff2;
+  color: var(--ink);
   font-style: italic;
 }
 
@@ -424,38 +482,44 @@ body {
   margin: 0;
   max-height: 108px;
   overflow: auto;
-  background: rgba(0, 0, 0, 0.35);
-  border-radius: 8px;
-  padding: 8px 10px;
+  background: var(--surface-tint);
+  border: 1px solid var(--line);
+  border-radius: 3px;
+  padding: 9px 11px;
   font-family: ui-monospace, "SF Mono", monospace;
   font-size: 11.5px;
   line-height: 1.45;
-  color: #d7cffa;
+  color: #43546a;
   white-space: pre-wrap;
   word-break: break-word;
 }
 
 .ov-gate {
   font-size: 14px;
-  font-weight: 600;
-  padding: 6px 10px;
-  border-radius: 8px;
-  background: rgba(255, 255, 255, 0.06);
+  font-weight: 500;
+  padding: 8px 11px;
+  border-radius: 3px;
+  background: var(--surface-tint);
+  border: 1px solid var(--line);
+  color: var(--ink-soft);
 }
 
 .ov-gate-pass {
-  color: #052e22;
-  background: var(--pass);
+  color: #05614a;
+  background: #eafaf3;
+  border-color: #9fe5cd;
 }
 
 .ov-gate-reject {
-  color: #3b0713;
-  background: var(--reject);
+  color: #912018;
+  background: #fdecea;
+  border-color: #f5b5ae;
 }
 
 .ov-gate-clarify {
-  color: #3a2a02;
-  background: var(--clarify);
+  color: #8a4b00;
+  background: #fdf3e4;
+  border-color: #f0d1a0;
 }
 
 /* Readable command summary, with the raw JSON tucked away */
@@ -478,22 +542,22 @@ body {
 }
 
 .ov-tag-intent {
-  background: rgba(20, 184, 166, 0.18);
-  border-color: rgba(20, 184, 166, 0.55);
-  color: #b6fff2;
+  background: #eef5ff;
+  border-color: #b9d6ff;
+  color: #0a4ea8;
   font-family: ui-monospace, "SF Mono", monospace;
 }
 
 .ov-tag-param {
-  background: rgba(255, 255, 255, 0.07);
-  border-color: rgba(255, 255, 255, 0.16);
-  color: var(--text);
+  background: var(--surface-tint);
+  border-color: var(--line);
+  color: var(--ink);
 }
 
 .ov-tag-role {
-  background: rgba(251, 191, 36, 0.14);
-  border-color: rgba(251, 191, 36, 0.45);
-  color: #ffe4a8;
+  background: #fdf3e4;
+  border-color: #f0d1a0;
+  color: #8a4b00;
 }
 
 .ov-raw {
@@ -533,18 +597,19 @@ body {
   position: fixed;
   right: 26px;
   top: 50%;
-  transform: translateY(-50%) scale(0.94);
+  transform: translateY(-50%) scale(0.96);
   z-index: 12;
   display: none;
-  background: var(--teal);
-  color: #06231f;
+  background: var(--blue-press);
+  color: #ffffff;
   border: none;
-  border-radius: 12px;
-  padding: 15px 22px;
+  border-radius: 3px;
+  padding: 15px 24px;
   font-size: 16px;
-  font-weight: 700;
+  font-weight: 500;
+  font-family: inherit;
   cursor: pointer;
-  box-shadow: 0 10px 34px rgba(20, 184, 166, 0.45);
+  box-shadow: 0 12px 34px rgba(0, 111, 238, 0.35);
   animation: boardPulse 1.9s ease-in-out infinite;
 }
 
@@ -553,11 +618,11 @@ body {
 }
 
 .ov-board:hover {
-  background: #2ad4c1;
+  background: #0a5fcc;
 }
 
 @keyframes boardPulse {
-  0%, 100% { transform: translateY(-50%) scale(0.94); }
+  0%, 100% { transform: translateY(-50%) scale(0.96); }
   50% { transform: translateY(-50%) scale(1.0); }
 }
 
@@ -664,6 +729,57 @@ body {
   border-radius: 3px;
   padding: 2px 6px;
   color: var(--ink);
+}
+
+/* Masthead and wordmark ------------------------------------------------ */
+
+.lp-masthead {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  padding: 30px 0 0;
+}
+
+/*
+ * The product name is set in the ink colour at medium weight with a mint rule
+ * beneath it. Mint is the highlight colour in this system, so the name reads as
+ * a mark rather than as another link.
+ */
+.lp-wordmark {
+  font-size: 20px;
+  font-weight: 500;
+  letter-spacing: -0.02em;
+  color: var(--ink);
+  padding-bottom: 3px;
+  border-bottom: 2px solid var(--mint);
+}
+
+.lp-masthead-note {
+  font-size: 12px;
+  font-weight: 500;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  color: #98a2b3;
+}
+
+/* The thesis line, which carries the product name in running text ------- */
+
+.lp-thesis {
+  margin: 0 0 28px;
+  font-size: 21px;
+  line-height: 1.5;
+  letter-spacing: -0.008em;
+  color: var(--ink);
+  max-width: 52ch;
+}
+
+.lp-mark {
+  font-weight: 500;
+  color: var(--ink);
+  background-image: linear-gradient(var(--mint), var(--mint));
+  background-repeat: no-repeat;
+  background-size: 100% 0.32em;
+  background-position: 0 88%;
 }
 
 /* Hero ----------------------------------------------------------------- */
