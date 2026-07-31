@@ -11,13 +11,13 @@
 import * as THREE from "three";
 
 /** How far a lane centre sits from the road centreline, in metres. */
-export const LANE_OFFSET = 2.0;
+export const LANE_OFFSET = 1.3;
 
 /**
  * Half the width of a lane, used to decide whether another vehicle is in the
  * same lane or the oncoming one. Below this counts as the same lane.
  */
-export const LANE_HALF_WIDTH = 2.6;
+export const LANE_HALF_WIDTH = 1.9;
 
 /**
  * The rightward direction for a heading, looking down on the map.
