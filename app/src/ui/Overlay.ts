@@ -86,7 +86,7 @@ export class Overlay {
     panel.innerHTML = `
       <div class="ov-section">
         <span class="ov-label">scenario</span>
-        <select class="ov-scenarios"></select>
+        <select class="ov-scenarios" aria-label="Choose a scenario"></select>
         <div class="ov-situation"></div>
       </div>
       <div class="ov-section">
@@ -97,16 +97,16 @@ export class Overlay {
       <div class="ov-section">
         <span class="ov-label">ride</span>
         <div class="ov-ride">
-          <button class="ov-hail">🚕 Call robotaxi</button>
-          <button class="ov-resume">▶ Resume</button>
+          <button class="ov-hail" aria-label="Call the robotaxi">🚕 Call robotaxi</button>
+          <button class="ov-resume" aria-label="Resume the robotaxi">▶ Resume</button>
         </div>
-        <select class="ov-places"></select>
-        <div class="ov-status">Cruising the city.</div>
+        <select class="ov-places" aria-label="Choose a destination"></select>
+        <div class="ov-status" role="status">Cruising the city.</div>
       </div>
       <div class="ov-row ov-controls">
-        <button class="ov-backend" title="Toggle model backend">Base</button>
-        <input class="ov-input" type="text" placeholder="Tell the robotaxi what to do..." />
-        <button class="ov-mic" title="Speak">🎙️</button>
+        <button class="ov-backend" title="Toggle model backend" aria-label="Use the base model">Base</button>
+        <input class="ov-input" type="text" aria-label="Robotaxi command" placeholder="Tell the robotaxi what to do..." />
+        <button class="ov-mic" title="Speak" aria-label="Speak a robotaxi command" aria-pressed="false">🎙️</button>
         <button class="ov-send">Send</button>
       </div>
       <div class="ov-examples"></div>
@@ -116,9 +116,9 @@ export class Overlay {
           <span class="ov-label">the car understood</span>
           <div class="ov-understood">-</div>
         </div>
-        <div class="ov-stage"><span class="ov-label">gate</span><div class="ov-gate">-</div></div>
-        <div class="ov-stage"><span class="ov-label">action</span><div class="ov-action">-</div></div>
-        <div class="ov-stage"><span class="ov-label">car says</span><div class="ov-speech">-</div></div>
+        <div class="ov-stage"><span class="ov-label">gate</span><div class="ov-gate" aria-live="polite">-</div></div>
+        <div class="ov-stage"><span class="ov-label">action</span><div class="ov-action" aria-live="polite">-</div></div>
+        <div class="ov-stage"><span class="ov-label">car says</span><div class="ov-speech" aria-live="polite">-</div></div>
         <div class="ov-because"></div>
         <details class="ov-raw">
           <summary>Raw model output</summary>
@@ -352,6 +352,10 @@ export class Overlay {
     this.backendToggle.title = available
       ? "Toggle model backend (base / fine-tuned)"
       : "Fine-tuned model not ready yet";
+    this.backendToggle.setAttribute(
+      "aria-label",
+      available ? "Toggle between the base and fine-tuned models" : "Fine-tuned model not ready"
+    );
   }
 
   /**
@@ -363,12 +367,17 @@ export class Overlay {
     if (!supported) {
       this.micButton.disabled = true;
       this.micButton.title = "Voice input not supported in this browser; type instead";
+      this.micButton.setAttribute(
+        "aria-label",
+        "Voice input is not supported in this browser; type a command instead"
+      );
     }
   }
 
   /** Toggle the mic button's active (listening) styling. */
   setMicActive(active: boolean): void {
     this.micButton.classList.toggle("ov-mic-active", active);
+    this.micButton.setAttribute("aria-pressed", String(active));
   }
 
   /**
