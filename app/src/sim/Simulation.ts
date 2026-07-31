@@ -105,7 +105,7 @@ export class Simulation {
     this.scene.scene.add(this.city.root);
 
     this.labels = new PlaceLabels(this.city.graph);
-    this.labels.build();
+    this.labels.build(this.city.buildings);
     this.scene.scene.add(this.labels.root);
 
     const mid = Math.floor(GRID_BLOCKS / 2);
