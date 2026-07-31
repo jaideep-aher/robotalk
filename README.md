@@ -311,3 +311,33 @@ Required environment variables:
 | `OPENAI_API_KEY` | Inference and dataset generation |
 | `OPENAI_MODEL` | Generation model, defaults to `gpt-4o` |
 | `FINETUNED_MODEL_ID` | The fine-tuned model, enabling the base and fine-tuned toggle |
+
+## What would have to change to ship this
+
+Everything here runs through a hosted API. That was the right call for
+answering the research question, and it is what made the base against
+fine-tuned comparison possible on identical footing. It is the wrong shape for
+a vehicle.
+
+A robotaxi cannot hold up a junction waiting on a network round trip, and it
+cannot lose the ability to refuse a stranger because it is parked in an
+underground car park with no signal. Latency and availability are not
+deployment details for this task, they are part of the safety argument: a gate
+that is sometimes unreachable is not a gate.
+
+The deployable version is a small open-weights model running on the car: a 1 to
+3 billion parameter Llama or Qwen, fine-tuned on this same corpus with LoRA,
+quantised, and served on the vehicle's own compute. The task suits a small
+model unusually well. The output is a short fixed schema rather than open
+prose, the label space is nine intents and three verdicts, and the Pydantic
+validator that gated the training data also gates inference, so a smaller
+model's failures surface as validation errors rather than as plausible wrong
+answers.
+
+The reason this is a paragraph and not a second model in the repository is
+honesty about scope: swapping the backend is a day of work, but claiming a
+result for it would require re-running the whole evaluation, and I would rather
+report the number I actually measured. The architecture is deliberately ready
+for it. `scripts/model.py` selects a backend behind one interface, so a local
+model joins as a third option beside base and fine-tuned without touching the
+schema, the simulator, or the metrics.
