@@ -134,11 +134,16 @@ class Command(BaseModel):
     def _check_gate_consistency(self) -> "Command":
         """Enforce the invariants that tie the gate to the other fields.
 
-        A rejected command must carry a reason. A clarify verdict must carry a
-        question. A passing command must not carry a clarification question and
-        should not smuggle in a rejection reason. A rejected command must not
-        also expose a passing action, so its intent is expected to be a safe
-        no-op (``stop`` or ``none``) unless it is a clarify.
+        A rejected command must carry a reason, must not carry a clarification
+        question, and must collapse its intent to a safe no-op. That last rule
+        is the important one: without it the schema would happily accept a row
+        that names the very action it claims to be refusing, for example
+        ``intent=unlock_doors`` alongside ``safety_gate=reject``. Such a row is
+        incoherent as a training label and dangerous as a model output, because
+        anything downstream reading the intent would act on it.
+
+        A clarify verdict must carry a question. A passing command must carry
+        neither a question nor a rejection reason.
         """
 
         if self.safety_gate == SafetyGate.reject:
@@ -147,6 +152,11 @@ class Command(BaseModel):
             if self.clarification_question:
                 raise ValueError(
                     "clarification_question must be null when safety_gate is reject"
+                )
+            if self.intent not in (Intent.stop, Intent.none):
+                raise ValueError(
+                    "a rejected command must collapse intent to stop or none, "
+                    f"not {self.intent.value}"
                 )
         elif self.safety_gate == SafetyGate.clarify:
             if not self.clarification_question:

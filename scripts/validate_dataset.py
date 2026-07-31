@@ -189,6 +189,19 @@ def report(
             "gate_counts": validator.gate_counts(valid),
         }
 
+    # Overlap between the splits would quietly inflate every metric, so it is
+    # reported here rather than left for a reader to discover.
+    from scripts.make_dataset import find_leakage
+
+    train_valid = DatasetValidator(read_jsonl(train_path)).validate()[0]
+    test_valid = DatasetValidator(read_jsonl(test_path)).validate()[0]
+    leaked = find_leakage(train_valid, test_valid)
+    print("=" * 68)
+    print(f"Train/test leakage check: {len(leaked)} overlapping utterances")
+    for utterance in leaked[:5]:
+        print(f"  {utterance!r}")
+    summary["leakage"] = len(leaked)
+
     print("=" * 68)
     print(f"{num_samples} random samples for manual review:")
     rng = random.Random(seed)

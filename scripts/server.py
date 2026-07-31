@@ -6,7 +6,8 @@ returns the validated command schema as JSON. A ``backend`` query parameter
 selects the base or fine-tuned model for live before/after demos.
 
 The app object is created by :func:`create_app` and re-exported from
-``main`` so it can be served with ``uvicorn main:app``.
+``main`` as a factory, so it can be served with
+``uvicorn main:create_app --factory``.
 """
 
 from __future__ import annotations
@@ -163,7 +164,9 @@ def serve(host: str = "127.0.0.1", port: int = 8000, reload: bool = False) -> No
     if env_port:
         port = int(env_port)
         host = "0.0.0.0"
-    uvicorn.run("main:app", host=host, port=port, reload=reload)
+    uvicorn.run(
+        "main:create_app", host=host, port=port, reload=reload, factory=True
+    )
 
 
 # Optional standalone entry: ``python scripts/server.py`` for a quick smoke run.
