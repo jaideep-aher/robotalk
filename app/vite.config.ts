@@ -8,6 +8,11 @@ import { defineConfig } from "vite";
  * the server and avoids any CORS handling in the browser.
  */
 export default defineConfig({
+  // Ensure a single copy of three, so addons (GLTFLoader, SkeletonUtils) share
+  // the same instance and instanceof checks stay valid.
+  resolve: {
+    dedupe: ["three"],
+  },
   server: {
     port: 5173,
     proxy: {
